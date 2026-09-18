@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 @pytest.fixture(scope="module")
 def scores() -> dict[str, float]:
     if not (os.environ.get("HF_TOKEN") or get_settings().llm_api_key):
+        if os.environ.get("REQUIRE_LIVE") == "1":  # set in CI so a missing secret fails loudly instead of skipping
+            pytest.fail("REQUIRE_LIVE=1 but no LLM credentials are set (HF_TOKEN secret missing?)")
         pytest.skip("no LLM credentials (set HF_TOKEN) - live test skipped")
     jd = (ROOT / "samples/jd_backend_engineer.txt").read_text(encoding="utf-8")
     pipe = ScoringPipeline()
