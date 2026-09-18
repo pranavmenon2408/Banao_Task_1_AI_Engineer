@@ -1,0 +1,491 @@
+{
+ "overall_score": 93.1,
+ "recommendation": "Strong fit",
+ "knockout_triggered": false,
+ "role_title": "Senior Backend Engineer",
+ "candidate_name": "ANANYA RAO",
+ "criteria": [
+  {
+   "criterion": {
+    "id": "c1",
+    "name": "Backend Experience",
+    "description": "Resume must show 5+ years of professional software engineering experience with at least 3 years building backend services",
+    "category": "experience",
+    "importance": "must_have",
+    "jd_evidence": "5+ years of professional software engineering experience"
+   },
+   "raw_level": 4,
+   "final_level": 4,
+   "points": 100.0,
+   "weight": 3.0,
+   "weighted_contribution": 15.08,
+   "reasoning": "The candidate has 8.2 years of professional software engineering experience, exceeding the required 5 years, and has at least 3 years building backend services in relevant roles such as Senior Software Engineer at Razorfin Payments and Software Engineer at LendQuick, meeting condition (a).",
+   "gaps": "",
+   "evidence": [
+    {
+     "quote": "8.2 years",
+     "found": false,
+     "similarity": 0.75
+    },
+    {
+     "quote": "Senior Software Engineer",
+     "found": true,
+     "similarity": 1.0
+    },
+    {
+     "quote": "Software Engineer",
+     "found": true,
+     "similarity": 1.0
+    }
+   ],
+   "grounded": true,
+   "jd_grounded": true,
+   "agreement": 1.0,
+   "flags": [
+    "Some quoted evidence was not found verbatim in the resume"
+   ]
+  },
+  {
+   "criterion": {
+    "id": "c2",
+    "name": "Python Skills",
+    "description": "Resume must show strong proficiency in Python and a modern web framework",
+    "category": "skill",
+    "importance": "must_have",
+    "jd_evidence": "Strong proficiency in Python and a modern web framework"
+   },
+   "raw_level": 4,
+   "final_level": 4,
+   "points": 100.0,
+   "weight": 3.0,
+   "weighted_contribution": 15.08,
+   "reasoning": "The candidate has used Python and modern web frameworks (FastAPI and Django) in multiple roles, meeting condition (b) for level 4.",
+   "gaps": "",
+   "evidence": [
+    {
+     "quote": "Python and FastAPI",
+     "found": true,
+     "similarity": 1.0
+    },
+    {
+     "quote": "Django REST Framework",
+     "found": true,
+     "similarity": 1.0
+    }
+   ],
+   "grounded": true,
+   "jd_grounded": true,
+   "agreement": 1.0,
+   "flags": []
+  },
+  {
+   "criterion": {
+    "id": "c3",
+    "name": "PostgreSQL Experience",
+    "description": "Resume must show solid experience with PostgreSQL or another relational database, including schema design and query optimisation",
+    "category": "experience",
+    "importance": "must_have",
+    "jd_evidence": "Solid experience with PostgreSQL or another relational database"
+   },
+   "raw_level": 4,
+   "final_level": 4,
+   "points": 100.0,
+   "weight": 3.0,
+   "weighted_contribution": 15.08,
+   "reasoning": "The candidate has solid experience with PostgreSQL, including schema design and query optimisation, as shown in the Senior Software Engineer role at Razorfin Payments, where they 'Optimised PostgreSQL queries and partitioned the ledger table, reducing p95 latency by 40%', meeting condition (b).",
+   "gaps": "",
+   "evidence": [
+    {
+     "quote": "PostgreSQL",
+     "found": true,
+     "similarity": 1.0
+    },
+    {
+     "quote": "Optimised PostgreSQL queries",
+     "found": true,
+     "similarity": 1.0
+    }
+   ],
+   "grounded": true,
+   "jd_grounded": true,
+   "agreement": 1.0,
+   "flags": []
+  },
+  {
+   "criterion": {
+    "id": "c4",
+    "name": "Cloud Deployment",
+    "description": "Resume must show hands-on experience deploying containerised services with Docker on a cloud provider",
+    "category": "experience",
+    "importance": "must_have",
+    "jd_evidence": "Hands-on experience deploying containerised services with Docker on a cloud provider"
+   },
+   "raw_level": 3,
+   "final_level": 3,
+   "points": 85.0,
+   "weight": 3.0,
+   "weighted_contribution": 12.81,
+   "reasoning": "The candidate has hands-on experience deploying containerised services with Docker on a cloud provider, as shown in the Software Engineer role at LendQuick, where they 'Containerised services with Docker and deployed them to AWS ECS'.",
+   "gaps": "To exceed, evidence of designing or leading a cloud deployment project with a stated measurable outcome would be required.",
+   "evidence": [
+    {
+     "quote": "Docker",
+     "found": true,
+     "similarity": 1.0
+    },
+    {
+     "quote": "AWS ECS",
+     "found": true,
+     "similarity": 1.0
+    }
+   ],
+   "grounded": true,
+   "jd_grounded": true,
+   "agreement": 1.0,
+   "flags": []
+  },
+  {
+   "criterion": {
+    "id": "c5",
+    "name": "Computer Science Degree",
+    "description": "Resume must show a Bachelor's degree in Computer Science or a related field, or equivalent practical experience",
+    "category": "education",
+    "importance": "must_have",
+    "jd_evidence": "Bachelor's degree in Computer Science or a related field"
+   },
+   "raw_level": 3,
+   "final_level": 3,
+   "points": 85.0,
+   "weight": 2.0999999999999996,
+   "weighted_contribution": 8.97,
+   "reasoning": "The candidate has a Bachelor's degree in Computer Science, which meets the requirement.",
+   "gaps": "",
+   "evidence": [
+    {
+     "quote": "B.E., Computer Science",
+     "found": true,
+     "similarity": 1.0
+    }
+   ],
+   "grounded": true,
+   "jd_grounded": true,
+   "agreement": 1.0,
+   "flags": []
+  },
+  {
+   "criterion": {
+    "id": "c6",
+    "name": "Message Queue Experience",
+    "description": "Resume must show experience with message queues or streaming systems such as Kafka or RabbitMQ",
+    "category": "experience",
+    "importance": "must_have",
+    "jd_evidence": "Experience with message queues or streaming systems"
+   },
+   "raw_level": 4,
+   "final_level": 4,
+   "points": 100.0,
+   "weight": 3.0,
+   "weighted_contribution": 15.08,
+   "reasoning": "The candidate has experience with message queues, including Kafka and RabbitMQ, as shown in the Senior Software Engineer role at Razorfin Payments, where they 'Introduced Kafka-based event pipeline for transaction status updates', and in the Software Engineer role at LendQuick, where they 'Implemented RabbitMQ workers for asynchronous KYC verification', meeting condition (b).",
+   "gaps": "",
+   "evidence": [
+    {
+     "quote": "Kafka",
+     "found": true,
+     "similarity": 1.0
+    },
+    {
+     "quote": "RabbitMQ",
+     "found": true,
+     "similarity": 1.0
+    }
+   ],
+   "grounded": true,
+   "jd_grounded": true,
+   "agreement": 1.0,
+   "flags": []
+  },
+  {
+   "criterion": {
+    "id": "c7",
+    "name": "Payments Experience",
+    "description": "Resume must show experience in payments, fintech or banking systems",
+    "category": "domain",
+    "importance": "nice_to_have",
+    "jd_evidence": "Experience in payments, fintech or banking systems"
+   },
+   "raw_level": 4,
+   "final_level": 4,
+   "points": 100.0,
+   "weight": 0.8,
+   "weighted_contribution": 4.02,
+   "reasoning": "The candidate has experience in payments, as shown by their work at Razorfin Payments, where they designed and built refunds and settlement APIs, and at LendQuick, where they built loan-disbursal microservices. This meets condition (a) as they have at least 1.5x the required years in relevant roles, with 8.2 years of total experience and significant experience in payments and fintech.",
+   "gaps": "",
+   "evidence": [
+    {
+     "quote": "Razorfin Payments",
+     "found": true,
+     "similarity": 1.0
+    },
+    {
+     "quote": "refunds and settlement APIs",
+     "found": true,
+     "similarity": 1.0
+    },
+    {
+     "quote": "loan-disbursal microservices",
+     "found": true,
+     "similarity": 1.0
+    }
+   ],
+   "grounded": true,
+   "jd_grounded": true,
+   "agreement": 1.0,
+   "flags": []
+  },
+  {
+   "criterion": {
+    "id": "c8",
+    "name": "Kubernetes Familiarity",
+    "description": "Resume must show familiarity with Kubernetes",
+    "category": "skill",
+    "importance": "nice_to_have",
+    "jd_evidence": "Familiarity with Kubernetes"
+   },
+   "raw_level": 2,
+   "final_level": 2,
+   "points": 55.0,
+   "weight": 1.0,
+   "weighted_contribution": 2.76,
+   "reasoning": "The candidate has listed Docker, which is related to Kubernetes, but there is no direct evidence of Kubernetes familiarity.",
+   "gaps": "Direct mention of Kubernetes or a project/example using it",
+   "evidence": [
+    {
+     "quote": "Docker",
+     "found": true,
+     "similarity": 1.0
+    }
+   ],
+   "grounded": true,
+   "jd_grounded": true,
+   "agreement": 1.0,
+   "flags": []
+  },
+  {
+   "criterion": {
+    "id": "c9",
+    "name": "Observability Tooling",
+    "description": "Resume must show experience with observability tooling such as Prometheus, Grafana, OpenTelemetry",
+    "category": "experience",
+    "importance": "nice_to_have",
+    "jd_evidence": "Experience with observability tooling"
+   },
+   "raw_level": 3,
+   "final_level": 3,
+   "points": 85.0,
+   "weight": 1.0,
+   "weighted_contribution": 4.27,
+   "reasoning": "The candidate has experience with observability tooling, including Prometheus and Grafana, as listed in their skills and not contradicted by other evidence.",
+   "gaps": "To exceed, evidence of designing or leading an observability project with a stated measurable outcome would be required.",
+   "evidence": [
+    {
+     "quote": "Prometheus",
+     "found": true,
+     "similarity": 1.0
+    },
+    {
+     "quote": "Grafana",
+     "found": true,
+     "similarity": 1.0
+    }
+   ],
+   "grounded": true,
+   "jd_grounded": true,
+   "agreement": 1.0,
+   "flags": []
+  }
+ ],
+ "strengths": [
+  "Backend Experience (level 4/4)",
+  "Python Skills (level 4/4)",
+  "PostgreSQL Experience (level 4/4)",
+  "Message Queue Experience (level 4/4)",
+  "Payments Experience (level 4/4)"
+ ],
+ "gaps": [],
+ "profile": {
+  "candidate_name": "ANANYA RAO",
+  "headline": "Senior Software Engineer | Backend & Distributed Systems",
+  "summary": "Ananya Rao is a backend engineer with 6 years of experience building payment and lending services in Python. She has worked with various companies, including Razorfin Payments and LendQuick, and has expertise in designing and building APIs, event pipelines, and microservices. She has also mentored junior engineers and led design reviews.",
+  "total_experience_years": 6.0,
+  "skills": [
+   "Python",
+   "FastAPI",
+   "Django",
+   "PostgreSQL",
+   "Redis",
+   "Kafka",
+   "RabbitMQ",
+   "Docker",
+   "AWS",
+   "ECS",
+   "RDS",
+   "S3",
+   "GitHub Actions",
+   "Prometheus",
+   "Grafana",
+   "Java",
+   "SQL"
+  ],
+  "experience": [
+   {
+    "title": "Senior Software Engineer",
+    "company": "Razorfin Payments",
+    "start": "Mar 2022",
+    "end": "Present",
+    "duration_months": null,
+    "highlights": [
+     "Designed and built the refunds and settlement APIs in Python and FastAPI, handling 4M requests per day.",
+     "Introduced Kafka-based event pipeline for transaction status updates, cutting reconciliation lag from 6 hours to 15 minutes.",
+     "Optimised PostgreSQL queries and partitioned the ledger table, reducing p95 latency by 40%.",
+     "Mentored three junior engineers and led design reviews for the payouts team."
+    ]
+   },
+   {
+    "title": "Software Engineer",
+    "company": "LendQuick",
+    "start": "Jul 2019",
+    "end": "Feb 2022",
+    "duration_months": 32,
+    "highlights": [
+     "Built loan-disbursal microservices with Django REST Framework and PostgreSQL.",
+     "Containerised services with Docker and deployed them to AWS ECS; set up CI/CD with GitHub Actions.",
+     "Implemented RabbitMQ workers for asynchronous KYC verification."
+    ]
+   },
+   {
+    "title": "Associate Engineer",
+    "company": "Infosys",
+    "start": "Jul 2018",
+    "end": "Jun 2019",
+    "duration_months": 12,
+    "highlights": [
+     "Maintained internal Java reporting tools and wrote SQL reports."
+    ]
+   }
+  ],
+  "education": [
+   {
+    "degree": "B.E.",
+    "field": "Computer Science",
+    "institution": "RV College of Engineering",
+    "year": "2018"
+   }
+  ],
+  "projects": [],
+  "certifications": [],
+  "other": []
+ },
+ "weights_used": {
+  "importance_weights": {
+   "must_have": 3.0,
+   "important": 2.0,
+   "nice_to_have": 1.0
+  },
+  "category_weights": {
+   "skill": 1.0,
+   "experience": 1.0,
+   "education": 0.7,
+   "certification": 0.7,
+   "domain": 0.8,
+   "soft_skill": 0.5
+  },
+  "level_points": {
+   "0": 0.0,
+   "1": 25.0,
+   "2": 55.0,
+   "3": 85.0,
+   "4": 100.0
+  },
+  "knockout": {
+   "enabled": true,
+   "cap": 45.0
+  }
+ },
+ "meta": {
+  "run_id": "233a04937ed6",
+  "model": "meta-llama/Llama-3.3-70B-Instruct",
+  "provider": "huggingface/auto",
+  "total_latency_ms": 8075.9,
+  "stages": [
+   {
+    "name": "resume_parsing",
+    "latency_ms": 7.8,
+    "llm_calls": 0,
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "retries": 0,
+    "cache_hit": false,
+    "detail": "pymupdf-columns"
+   },
+   {
+    "name": "job_description_parsing",
+    "latency_ms": 0.9,
+    "llm_calls": 0,
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "retries": 0,
+    "cache_hit": false,
+    "detail": "text"
+   },
+   {
+    "name": "jd_criteria_extraction",
+    "latency_ms": 0.3,
+    "llm_calls": 0,
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "retries": 0,
+    "cache_hit": true,
+    "detail": null
+   },
+   {
+    "name": "resume_profile_extraction",
+    "latency_ms": 10.7,
+    "llm_calls": 0,
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "retries": 0,
+    "cache_hit": true,
+    "detail": null
+   },
+   {
+    "name": "criterion_scoring",
+    "latency_ms": 8054.8,
+    "llm_calls": 4,
+    "prompt_tokens": 5356,
+    "completion_tokens": 862,
+    "retries": 0,
+    "cache_hit": false,
+    "detail": null
+   },
+   {
+    "name": "grounding_and_aggregation",
+    "latency_ms": 1.2,
+    "llm_calls": 0,
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "retries": 0,
+    "cache_hit": false,
+    "detail": null
+   }
+  ],
+  "resume_chars": 1315,
+  "resume_chunks": 1,
+  "jd_hash": "362ead3047148328",
+  "extraction": {
+   "resume": "pymupdf-columns",
+   "job_description": "text"
+  },
+  "warnings": []
+ }
+}

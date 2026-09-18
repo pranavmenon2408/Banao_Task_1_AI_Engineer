@@ -20,13 +20,20 @@ The design decisions and measurements are in **[EXPLANATION.md](EXPLANATION.md)*
 [docs/DEVLOG.md](docs/DEVLOG.md).
 
 ```
-app/            FastAPI backend: parsing, chunking, agents, grounding, scoring
+app/
+  api/          FastAPI app (main.py) and the error contract (errors.py)
+  core/         settings, Pydantic schemas, on-disk cache
+  documents/    PDF/DOCX/TXT parsing, column-aware PDF layout, OCR, resume chunking
+  llm/          provider registry and the provider-agnostic LLM client
+  agents/       extraction agent, scoring agent, prompts, prompt rendering
+  scoring/      aggregation (weights -> score), quote verification, years of experience
+  pipeline.py   orchestrates the stages and records per-stage metrics
 ui/             Streamlit front end (talks to the API over HTTP)
-config/         scoring.yaml: weights, rubric points, thresholds, scorer settings
-samples/        sample JD, three resumes for calibration, unreadable resume PDFs
+config/         scoring.yaml: weights, rubric points, thresholds, OCR and scorer settings
+samples/        sample JD, calibration resumes, two-column and scanned copies, unreadable PDFs
 scripts/        calibrate.py (consistency check), make_samples.py
-tests/          pytest suite (no API key needed)
-reports/        calibration results
+tests/          pytest suite; LLM calls are faked except in tests/test_live.py
+docs/DEVLOG.md  build log with every measurement
 ```
 
 ---
@@ -162,13 +169,26 @@ fallback step-down, JSON repair).
   recommendation bands, grounding threshold, scoring mode, scorer temperature and samples, OCR settings
   (page cap, Tesseract DPI and confidence threshold, vision-model fallback).
 
-### Tests and calibration
+### Tests, linting and calibration
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                                    # no token needed; the LLM is faked
-python -m scripts.calibrate --repeats 3   # real LLM: scores 3 sample resumes 3x each
+ruff check . && ruff format --check .     # lint + formatting
+pytest -m "not live"                      # unit tests; no token needed, LLM calls are faked
+pytest -m live                            # end-to-end calibration check against the real provider (needs HF_TOKEN)
+python -m scripts.calibrate --repeats 3   # full calibration report: 3 sample resumes x 3 runs
 ```
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on GitHub-hosted runners for every push to `main` and every pull request:
+
+1. **Lint:** `ruff check` and `ruff format --check`.
+2. **Unit tests:** installs Tesseract, then runs `pytest -m "not live"`.
+3. **Live calibration check:** runs after the first two pass, on pushes and manual runs only (secrets are not
+   available to forked pull requests). It scores the three sample resumes with real Hugging Face calls, using the
+   `HF_TOKEN` repository secret, and asserts that the similar resumes land close together and the weak one scores
+   low.
 
 ---
 
