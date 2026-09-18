@@ -55,6 +55,7 @@ class ScoringConfig(BaseModel):
     scorer_input_format: Literal["markdown", "json"] = "markdown"
     scorer_temperature: float = Field(0.0, ge=0, le=1.5)
     scorer_samples: int = Field(1, ge=1, le=7)
+    scoring_mode: Literal["single", "sectioned"] = "single"
     importance_weights: dict[str, float]
     category_weights: dict[str, float]
     level_points: dict[int, float]

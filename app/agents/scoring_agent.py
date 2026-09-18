@@ -1,9 +1,14 @@
 """Agent 2: job description -> criteria, then (profile x criteria) -> per-criterion rubric levels.
 
-All criteria are scored in ONE call against the same profile. Scoring each criterion in a separate
-call was considered: it isolates criteria from each other, but costs N calls per resume and runs
-into provider rate limits. The prompt instead asks the model to rate each criterion independently
-and the rubric anchors each level to concrete evidence.
+Two scoring modes (config: scoring_mode):
+  single     all criteria in ONE call against the whole profile. Cheapest, but in calibration runs
+             the model judged criteria together: c2-c5 flipped 3<->4 as a block (halo effect).
+  sectioned  criteria are grouped by JD section (experience / skills / education / domain) and each
+             group is scored in its own call, in parallel, against only the resume sections that can
+             evidence it, with section-specific rules (e.g. a skill named only in the skills list is
+             at most "partial"; years of experience are computed in code, not by the model).
+Scoring every criterion in its own call was also considered; sections are the middle ground between
+isolation and the number of calls (~4 vs ~10 per resume) under provider rate limits.
 
 Optional self-consistency: with scorer_samples > 1 the scorer runs that many times in parallel at
 scorer_temperature and the median level per criterion wins; the reasoning/evidence shown is taken
@@ -16,8 +21,9 @@ import statistics
 from concurrent.futures import ThreadPoolExecutor
 
 from app.llm import LLMClient, LLMError
-from app.render import criteria_text, profile_text
-from app.prompts import CRITERIA_EXTRACTOR_SYSTEM, CRITERIA_EXTRACTOR_USER, SCORER_SYSTEM, SCORER_USER
+from app.render import ALL_PARTS, criteria_text, profile_text
+from app.prompts import (CATEGORY_SECTION, CRITERIA_EXTRACTOR_SYSTEM, CRITERIA_EXTRACTOR_USER, SCORER_SYSTEM,
+                         SCORER_USER, SECTION_FOCUS, SECTION_PARTS)
 from app.schemas import (AssessmentList, CriteriaList, CriterionAssessment, ErrorCode, ResumeProfile,
                          StageMetric)
 
@@ -66,40 +72,53 @@ def _vote(samples: list[dict[str, CriterionAssessment]], ids: list[str]) -> dict
     return out
 
 
+def _jobs(profile: ResumeProfile, criteria: list, mode: str, fmt: str) -> list[tuple[str, str, list]]:
+    """Return (system prompt, profile text, criteria) per scoring call."""
+    if mode == "single":
+        return [(SCORER_SYSTEM, profile_text(profile, fmt), criteria)]
+    groups: dict[str, list] = {}
+    for c in criteria:
+        groups.setdefault(CATEGORY_SECTION.get(c.category, "domain"), []).append(c)
+    return [(SCORER_SYSTEM + "\n\n" + SECTION_FOCUS[sec],
+             profile_text(profile, fmt, SECTION_PARTS.get(sec, ALL_PARTS), computed_years=True),
+             crits) for sec, crits in groups.items()]
+
+
 def score_profile(llm: LLMClient, profile: ResumeProfile, criteria: CriteriaList, metric: StageMetric,
-                  input_format: str = "markdown", temperature: float = 0.0,
-                  samples: int = 1) -> dict[str, CriterionAssessment]:
-    prof = profile_text(profile, input_format)
-
-    def _ask(crits, m: StageMetric) -> dict[str, CriterionAssessment]:
+                  input_format: str = "markdown", temperature: float = 0.0, samples: int = 1,
+                  mode: str = "single") -> dict[str, CriterionAssessment]:
+    def _ask(system: str, prof: str, crits: list, m: StageMetric) -> dict[str, CriterionAssessment]:
         user = SCORER_USER.format(criteria=criteria_text(crits, input_format), profile=prof)
-        res = llm.complete_json(SCORER_SYSTEM, user, AssessmentList, m, max_tokens=3000, temperature=temperature)
-        return {a.criterion_id: a for a in res.assessments}
+        res = llm.complete_json(system, user, AssessmentList, m, max_tokens=3000, temperature=temperature)
+        wanted = {c.id for c in crits}
+        return {a.criterion_id: a for a in res.assessments if a.criterion_id in wanted}
 
-    ids = [c.id for c in criteria.criteria]
-    if samples == 1:
-        by_id = _ask(criteria.criteria, metric)
-    else:
-        metrics = [StageMetric(name="sample", latency_ms=0) for _ in range(samples)]
-        results, errors = [], []
-        with ThreadPoolExecutor(max_workers=samples) as pool:
-            futures = [pool.submit(_ask, criteria.criteria, m) for m in metrics]
-            for f in futures:
-                try:
-                    results.append(f.result())
-                except LLMError as exc:  # one failed sample shouldn't sink the request
-                    errors.append(exc)
-        _merge_metric(metric, metrics)
-        if not results:
-            raise errors[0]
-        by_id = _vote(results, ids)
+    jobs = _jobs(profile, criteria.criteria, mode, input_format)
+    calls = [(j, k) for j in range(len(jobs)) for k in range(samples)]
+    metrics = [StageMetric(name="call", latency_ms=0) for _ in calls]
+    per_job: list[list[dict]] = [[] for _ in jobs]
+    errors: list[LLMError] = []
+    with ThreadPoolExecutor(max_workers=min(8, len(calls))) as pool:
+        futures = [pool.submit(_ask, *jobs[j], m) for (j, _), m in zip(calls, metrics)]
+        for (j, _), f in zip(calls, futures):
+            try:
+                per_job[j].append(f.result())
+            except LLMError as exc:  # one failed call shouldn't sink the request; missing ids are retried below
+                errors.append(exc)
+    _merge_metric(metric, metrics)
+    if errors and not any(per_job):
+        raise errors[0]
 
-    missing = [cid for cid in ids if cid not in by_id]
+    by_id: dict[str, CriterionAssessment] = {}
+    for (_, _, crits), results in zip(jobs, per_job):
+        by_id.update(_vote(results, [c.id for c in crits]))
+
+    missing = [c for c in criteria.criteria if c.id not in by_id]
     if missing:
         # Rather than silently scoring a missing criterion 0, ask once more for just those.
-        retry = _ask([c for c in criteria.criteria if c.id in missing], metric)
-        by_id.update({cid: a for cid, a in retry.items() if cid in missing})
-    for cid in missing:
-        by_id.setdefault(cid, CriterionAssessment(criterion_id=cid, level=0, reasoning="The model returned no assessment for this criterion.",
-                                                  resume_evidence=[], gaps="Not assessed."))
+        for system, prof, crits in _jobs(profile, missing, mode, input_format):
+            by_id.update(_ask(system, prof, crits, metric))
+    for c in criteria.criteria:
+        by_id.setdefault(c.id, CriterionAssessment(criterion_id=c.id, level=0, reasoning="The model returned no assessment for this criterion.",
+                                                   resume_evidence=[], gaps="Not assessed."))
     return by_id

@@ -76,7 +76,8 @@ class ScoringPipeline:
         profile, n_chunks = self.get_profile(resume_text, stages)
         with _stage(stages, "criterion_scoring") as m:
             assessments = score_profile(self.llm, profile, criteria, m, self.cfg.scorer_input_format,
-                                        self.cfg.scorer_temperature, self.cfg.scorer_samples)
+                                        self.cfg.scorer_temperature, self.cfg.scorer_samples,
+                                        self.cfg.scoring_mode)
 
         with _stage(stages, "grounding_and_aggregation"):
             resume_g, jd_g = Grounder(resume_text), Grounder(jd_text)

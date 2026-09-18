@@ -45,15 +45,16 @@ def main() -> None:
     ap.add_argument("--input-format", choices=["markdown", "json"], default=None)
     ap.add_argument("--scorer-temperature", type=float, default=None)
     ap.add_argument("--scorer-samples", type=int, default=None)
+    ap.add_argument("--scoring-mode", choices=["single", "sectioned"], default=None)
     args = ap.parse_args()
 
     llm = LLMClient(model=args.model, provider=args.provider)
     pipe = ScoringPipeline(llm=llm, cache_criteria=not args.fresh_criteria, cache_profiles=False)
     overrides = {"scorer_input_format": args.input_format, "scorer_temperature": args.scorer_temperature,
-                 "scorer_samples": args.scorer_samples}
+                 "scorer_samples": args.scorer_samples, "scoring_mode": args.scoring_mode}
     pipe.cfg = pipe.cfg.model_copy(update={k: v for k, v in overrides.items() if v is not None})
     fmt = pipe.cfg.scorer_input_format
-    variant = f"{fmt}_T{pipe.cfg.scorer_temperature}_n{pipe.cfg.scorer_samples}"
+    variant = f"{pipe.cfg.scoring_mode}_{fmt}_T{pipe.cfg.scorer_temperature}_n{pipe.cfg.scorer_samples}"
     jd = (ROOT / JD).read_text(encoding="utf-8")
 
     runs: dict[str, list[dict]] = {k: [] for k in SAMPLES}
@@ -98,14 +99,14 @@ def main() -> None:
     out_dir.mkdir(exist_ok=True)
     tag = ("fresh-criteria" if args.fresh_criteria else "cached-criteria") + f"_{variant}_" + llm.model.split("/")[-1]
     report = {"model": llm.model, "provider": llm.provider, "repeats": args.repeats, "input_format": fmt,
-              "scorer_temperature": pipe.cfg.scorer_temperature, "scorer_samples": pipe.cfg.scorer_samples,
+              "scorer_temperature": pipe.cfg.scorer_temperature, "scorer_samples": pipe.cfg.scorer_samples, "scoring_mode": pipe.cfg.scoring_mode,
               "fresh_criteria": args.fresh_criteria, "summary": summary, "gap_A_B": gap_ab,
               "wall_time_s": round(time.perf_counter() - t_start, 1), "runs": runs}
     (out_dir / f"calibration_{tag}.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
 
     lines = [f"# Calibration report: {llm.model}",
              f"",
-             f"- Provider: `{llm.provider}`, temperature 0, seed fixed, scorer input format: `{fmt}`, scorer temperature {pipe.cfg.scorer_temperature}, scorer samples {pipe.cfg.scorer_samples}",
+             f"- Provider: `{llm.provider}`, temperature 0, seed fixed, scorer input format: `{fmt}`, scorer temperature {pipe.cfg.scorer_temperature}, scorer samples {pipe.cfg.scorer_samples}, scoring mode `{pipe.cfg.scoring_mode}`",
              f"- Repeats per resume: {args.repeats}; JD criteria {'re-extracted every run' if args.fresh_criteria else 'cached per JD'}; profile cache off",
              f"- **|mean(A) - mean(B)| = {gap_ab}** (requirement: similar resumes must not be 40 points apart)",
              f"",
