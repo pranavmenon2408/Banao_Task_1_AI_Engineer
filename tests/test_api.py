@@ -20,6 +20,7 @@ def client(monkeypatch):
         def run(self, *a, **k):
             raise LLMError(ErrorCode.LLM_UNAVAILABLE, "provider down")
     monkeypatch.setattr(main, "get_pipeline", lambda: StubPipeline())
+    monkeypatch.setattr(main, "get_ocr", lambda: None)  # no Tesseract / network in API contract tests
     return TestClient(main.app)
 
 

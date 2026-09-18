@@ -326,9 +326,12 @@ with tab3:
     m = res["meta"]
     st.caption(f"Run `{m['run_id']}` · model `{m['model']}` via `{m['provider']}` · "
                f"resume {m['resume_chars']:,} chars in {m['resume_chunks']} chunk(s)")
+    if m.get("extraction"):
+        st.caption("Text extraction: " + " · ".join(f"{k.replace('_', ' ')} → `{v}`" for k, v in m["extraction"].items()))
     rows = [{"Stage": s["name"].replace("_", " "), "Latency (s)": round(s["latency_ms"] / 1000, 2),
              "LLM calls": s["llm_calls"], "Prompt tok": s["prompt_tokens"], "Completion tok": s["completion_tokens"],
-             "Retries": s["retries"], "Cache hit": "✓" if s["cache_hit"] else ""} for s in m["stages"]]
+             "Retries": s["retries"], "Cache hit": "✓" if s["cache_hit"] else "",
+             "Detail": s.get("detail") or ""} for s in m["stages"]]
     st.dataframe(rows, width="stretch", hide_index=True)
     tot_tok = sum(s["prompt_tokens"] + s["completion_tokens"] for s in m["stages"])
     st.caption(f"Total tokens: {tot_tok:,} · Total LLM calls: {sum(s['llm_calls'] for s in m['stages'])}")

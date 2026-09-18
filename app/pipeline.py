@@ -67,9 +67,10 @@ class ScoringPipeline:
             return profile, n
 
     def run(self, resume_text: str, jd_text: str, overrides: WeightOverrides | None = None,
-            warnings: list[str] | None = None) -> ScoreResult:
+            warnings: list[str] | None = None, parse_stages: list[StageMetric] | None = None,
+            extraction: dict[str, str] | None = None) -> ScoreResult:
         t0 = time.perf_counter()
-        stages: list[StageMetric] = []
+        stages: list[StageMetric] = list(parse_stages or [])
         warnings = list(warnings or [])
 
         criteria, jd_hash = self.get_criteria(jd_text, stages)
@@ -96,7 +97,8 @@ class ScoringPipeline:
             warnings.append(f"{ungrounded} criterion score(s) cited evidence not found in the resume and were reduced.")
 
         meta = RunMeta(run_id=uuid.uuid4().hex[:12], model=self.llm.model, provider=self.llm.provider,
-                       total_latency_ms=round((time.perf_counter() - t0) * 1000, 1), stages=stages,
+                       total_latency_ms=round((time.perf_counter() - t0) * 1000 + sum(s.latency_ms for s in parse_stages or []), 1),
+                       stages=stages, extraction=extraction or {},
                        resume_chars=len(resume_text), resume_chunks=n_chunks, jd_hash=jd_hash, warnings=warnings)
         result = ScoreResult(overall_score=overall, recommendation=label, knockout_triggered=knockout,
                              role_title=criteria.role_title, candidate_name=profile.candidate_name, criteria=scored,

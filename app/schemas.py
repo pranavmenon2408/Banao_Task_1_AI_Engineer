@@ -137,6 +137,7 @@ class StageMetric(BaseModel):
     completion_tokens: int = 0
     retries: int = 0
     cache_hit: bool = False
+    detail: str | None = None
 
 
 class RunMeta(BaseModel):
@@ -148,6 +149,7 @@ class RunMeta(BaseModel):
     resume_chars: int
     resume_chunks: int
     jd_hash: str
+    extraction: dict[str, str] = Field(default_factory=dict, description="How each document's text was obtained")
     warnings: list[str] = Field(default_factory=list)
 
 

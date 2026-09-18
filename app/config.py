@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     hf_token: str = ""
     hf_model: str = "Qwen/Qwen2.5-72B-Instruct"
     hf_provider: str = "auto"
+    hf_vlm_model: str = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+    tesseract_cmd: str = ""  # path to tesseract binary if it is not on PATH
     llm_temperature: float = 0.0
     llm_seed: int = 42
     llm_timeout_s: float = 90
@@ -51,6 +53,17 @@ class Limits(BaseModel):
     min_resume_chars: int = 200
 
 
+class OcrConfig(BaseModel):
+    enabled: bool = True
+    max_pages: int = Field(4, ge=1, le=20)
+    tesseract_dpi: int = Field(300, ge=72, le=600)
+    tesseract_min_confidence: float = Field(70, ge=0, le=100)
+    min_chars: int = Field(200, ge=0)
+    vlm_fallback: bool = True
+    vlm_max_side_px: int = Field(1600, ge=512, le=4096)
+    vlm_max_parallel: int = Field(4, ge=1, le=16)
+
+
 class ScoringConfig(BaseModel):
     scorer_input_format: Literal["markdown", "json"] = "markdown"
     scorer_temperature: float = Field(0.0, ge=0, le=1.5)
@@ -63,6 +76,7 @@ class ScoringConfig(BaseModel):
     knockout: Knockout = Knockout()
     recommendation_bands: list[Band]
     limits: Limits = Limits()
+    ocr: OcrConfig = OcrConfig()
 
     @model_validator(mode="after")
     def _check(self) -> "ScoringConfig":

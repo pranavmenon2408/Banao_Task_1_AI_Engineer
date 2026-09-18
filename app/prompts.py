@@ -5,6 +5,17 @@ PROMPT_VERSION = "v7"       # resume extraction + scoring prompts
 CRITERIA_PROMPT_VERSION = "c1"  # JD criteria prompt (separate so scorer changes keep cached criteria)
 
 # ---------------------------------------------------------------------------------------------
+# OCR fallback: vision model transcribes a scanned page
+# ---------------------------------------------------------------------------------------------
+
+VLM_TRANSCRIBE_PROMPT = """Transcribe ALL text on this document page exactly as written.
+- Keep the original words, spelling, numbers, dates and punctuation. Do not correct, summarise, translate or add anything.
+- Reading order: if the page has columns (e.g. a sidebar), transcribe each column top to bottom, left column first.
+- Put each line or bullet on its own line; keep section headings on their own line.
+- Output plain text only: no commentary, no Markdown, no code fences.
+- If the page has no readable text, output exactly: NO_TEXT"""
+
+# ---------------------------------------------------------------------------------------------
 # Agent 1: resume -> structured profile
 # ---------------------------------------------------------------------------------------------
 

@@ -61,6 +61,19 @@ recommendation_bands:   # evaluated top-down: first band whose min <= score wins
   - {label: "Weak fit", min: 35}
   - {label: "Not a fit", min: 0}
 
+# Scanned / image-only PDFs. Tesseract runs first (local, ~0.9 s/page, free); if it is missing, errors,
+# or its word confidence is below the threshold, a Hugging Face vision model (HF_VLM_MODEL) transcribes
+# the pages instead (~6 s/page, ~2.7k tokens/page). Measured choices are in docs/DEVLOG.md.
+ocr:
+  enabled: true
+  max_pages: 4                  # resumes rarely exceed 3-4 pages; every extra page is latency and cost
+  tesseract_dpi: 300            # 300 dpi read 100% of sample lines exactly vs 94% at 150-200, for +0.2 s/page
+  tesseract_min_confidence: 70  # clean scan scored ~94; below 70 the text is too unreliable to ground on
+  min_chars: 200
+  vlm_fallback: true
+  vlm_max_side_px: 1600         # image tokens grow with pixels; 1600 px keeps 9-10 pt text legible
+  vlm_max_parallel: 4
+
 limits:
   max_criteria: 12            # cap extracted JD criteria (keeps scoring focused & cheap)
   resume_chunk_tokens: 3000   # token budget per resume chunk for the extraction agent

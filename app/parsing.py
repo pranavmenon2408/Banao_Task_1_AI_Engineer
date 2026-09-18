@@ -2,19 +2,30 @@
 
 "Unreadable" is not one failure: an image-only scan, an encrypted PDF, a corrupt file and a PDF
 whose fonts extract as junk all need different advice for the recruiter, so each gets its own code.
+
+PDFs are read with PyMuPDF using column-aware reading order (app/pdf_layout.py). A PDF with no text
+layer is sent to OCR (app/ocr.py: Tesseract, then a vision model) when an OCR engine is supplied;
+only if OCR also fails is it rejected as unreadable.
 """
 from __future__ import annotations
 
 import io
 import re
+import time
 import unicodedata
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
+import pymupdf
 from docx import Document
-from pypdf import PdfReader
-from pypdf.errors import PdfReadError
 
-from app.schemas import ErrorCode
+from app import pdf_layout
+from app.schemas import ErrorCode, StageMetric
+
+if TYPE_CHECKING:
+    from app.ocr import OcrEngine
+
+pymupdf.TOOLS.mupdf_display_errors(False)  # we report parse failures ourselves
 
 MAX_BYTES = 10 * 1024 * 1024
 
@@ -31,6 +42,8 @@ class ParsedDocument:
     kind: str
     pages: int = 1
     warnings: list[str] = field(default_factory=list)
+    method: str = ""                      # e.g. "pymupdf", "pymupdf-columns", "ocr-tesseract", "ocr-vlm", "docx"
+    metric: StageMetric | None = None     # latency (and VLM tokens) of getting the text
 
 
 def _sniff(filename: str, data: bytes, allowed: set[str]) -> str:
@@ -66,25 +79,53 @@ def _decode_text(data: bytes) -> str:
     return data.decode("utf-8", errors="replace")
 
 
-def _pdf_text(data: bytes) -> tuple[str, int]:
+def _open_pdf(data: bytes) -> pymupdf.Document:
     try:
-        reader = PdfReader(io.BytesIO(data))
-        if reader.is_encrypted:
-            # Many "encrypted" PDFs only carry an owner password and open with an empty user password.
-            try:
-                ok = reader.decrypt("")
-            except Exception:
-                ok = 0
-            if not ok:
-                raise DocumentError(ErrorCode.ENCRYPTED_FILE, "The PDF is password protected.",
-                                    "Ask the candidate for an unprotected copy.")
-        pages = [p.extract_text() or "" for p in reader.pages]
-    except DocumentError:
-        raise
-    except (PdfReadError, ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
+        doc = pymupdf.open(stream=data, filetype="pdf")
+    except Exception as exc:  # FileDataError and friends
         raise DocumentError(ErrorCode.CORRUPT_FILE, f"The PDF could not be parsed ({type(exc).__name__}: {exc}).",
                             "The file may be damaged. Re-export it as PDF or upload a .txt/.docx version.")
-    return "\n\n".join(pages), len(pages)
+    # Many "encrypted" PDFs only carry an owner password and open with an empty user password.
+    if doc.needs_pass and not doc.authenticate(""):
+        raise DocumentError(ErrorCode.ENCRYPTED_FILE, "The PDF is password protected.",
+                            "Ask the candidate for an unprotected copy.")
+    if doc.page_count == 0:
+        raise DocumentError(ErrorCode.CORRUPT_FILE, "The PDF has no readable pages.",
+                            "The file may be damaged. Re-export it as PDF or upload a .txt/.docx version.")
+    return doc
+
+
+def _pdf_text(data: bytes, ocr: "OcrEngine | None", purpose: str,
+              metric: StageMetric) -> tuple[str, int, str, list[str]]:
+    doc = _open_pdf(data)
+    try:
+        raw, multi = pdf_layout.extract(doc)
+    except Exception as exc:
+        raise DocumentError(ErrorCode.CORRUPT_FILE, f"Text could not be read from the PDF ({type(exc).__name__}: {exc}).")
+    pages = doc.page_count
+    method = "pymupdf-columns" if multi else "pymupdf"
+    if len(normalize(raw)) >= max(50, 30 * pages):
+        return raw, pages, method, []
+
+    # No text layer: a scan or a photo of a resume.
+    if ocr is None or not ocr.cfg.enabled:
+        raise DocumentError(
+            ErrorCode.NO_TEXT_LAYER,
+            f"The PDF has {pages} page(s) but almost no extractable text, so it is probably a scanned image.",
+            "OCR is disabled. Ask for a text-based PDF, or upload a .txt/.docx version.")
+    from app.ocr import OcrFailed
+    try:
+        out = ocr.run(doc, metric)
+    except OcrFailed as exc:
+        raise DocumentError(
+            ErrorCode.NO_TEXT_LAYER,
+            f"The {purpose} PDF is a scanned image and OCR could not read it ({'; '.join(exc.notes)}).",
+            "Ask for a text-based PDF or a clearer scan, or upload a .txt/.docx version.")
+    how = ("Tesseract OCR" + (f", confidence {out.confidence:.0f}/100" if out.confidence is not None else "")
+           if out.method == "tesseract" else f"a vision model ({ocr.s.hf_vlm_model.split('/')[-1]})")
+    warnings = [f"The {purpose} is a scanned image; its text was read with {how}. "
+                "Check quoted evidence against the original if a score looks off."] + out.notes
+    return out.text, pages, f"ocr-{out.method}", warnings
 
 
 def _docx_text(data: bytes) -> str:
@@ -123,22 +164,30 @@ def garble_ratio(text: str) -> float:
 
 
 def extract_text(filename: str, data: bytes, *, allowed: set[str] = frozenset({"pdf", "docx", "txt"}),
-                 min_chars: int = 0, max_chars: int = 60000, purpose: str = "resume") -> ParsedDocument:
+                 min_chars: int = 0, max_chars: int = 60000, purpose: str = "resume",
+                 ocr: "OcrEngine | None" = None) -> ParsedDocument:
     if not data:
         raise DocumentError(ErrorCode.EMPTY_FILE, f"The {purpose} file is empty.")
     if len(data) > MAX_BYTES:
         raise DocumentError(ErrorCode.FILE_TOO_LARGE, f"The {purpose} file exceeds {MAX_BYTES // 1024 // 1024} MB.")
 
     kind = _sniff(filename, data, set(allowed))
-    pages = 1
+    t0 = time.perf_counter()
+    metric = StageMetric(name=f"{purpose.replace(' ', '_')}_parsing", latency_ms=0)
+    pages, warnings = 1, []
     if kind == "pdf":
-        raw, pages = _pdf_text(data)
+        raw, pages, method, warnings = _pdf_text(data, ocr, purpose, metric)
     elif kind == "docx":
-        raw = _docx_text(data)
+        raw, method = _docx_text(data), "docx"
     else:
-        raw = _decode_text(data)
-    return check_text(normalize(raw), kind=kind, pages=pages, min_chars=min_chars,
+        raw, method = _decode_text(data), "text"
+    metric.latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+    metric.detail = method
+    doc = check_text(normalize(raw), kind="ocr" if method.startswith("ocr") else kind, pages=pages, min_chars=min_chars,
                       max_chars=max_chars, purpose=purpose)
+    doc.warnings = warnings + doc.warnings
+    doc.method, doc.metric = method, metric
+    return doc
 
 
 def check_text(text: str, *, kind: str = "txt", pages: int = 1, min_chars: int = 0,

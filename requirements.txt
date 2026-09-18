@@ -5,7 +5,9 @@ pydantic==2.*
 pydantic-settings==2.*
 python-dotenv==1.*
 huggingface_hub>=0.30
-pypdf==5.*
+pymupdf==1.*
+pytesseract==0.3.*
+pillow>=10.1
 python-docx==1.*
 PyYAML==6.*
 streamlit==1.*

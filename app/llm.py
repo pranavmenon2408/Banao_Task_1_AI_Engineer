@@ -78,13 +78,14 @@ class LLMClient:
             self._client = InferenceClient(provider=self.provider, api_key=self.s.hf_token, timeout=self.s.llm_timeout_s)
         return self._client
 
-    def _call(self, messages: list[dict], max_tokens: int, metric: StageMetric, temperature: float | None = None) -> str:
+    def _call(self, messages: list[dict], max_tokens: int, metric: StageMetric, temperature: float | None = None,
+              json_mode: bool = True) -> str:
         attempt = 0
         while True:
             temp = self.s.llm_temperature if temperature is None else temperature
             # A fixed seed with temperature > 0 would make every "sample" identical on providers that honour it.
             kwargs = dict(model=self.model, max_tokens=max_tokens, temperature=temp, seed=self.s.llm_seed if temp == 0 else None)
-            if self._json_mode:
+            if self._json_mode and json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
             try:
                 metric.llm_calls += 1
@@ -98,7 +99,7 @@ class LLMClient:
                     log.warning("LLM output hit max_tokens=%s; JSON may be truncated", max_tokens)
                 return content
             except BadRequestError as exc:
-                if self._json_mode and "response_format" in str(exc).lower() + str(getattr(exc, "server_message", "")).lower():
+                if self._json_mode and json_mode and "response_format" in str(exc).lower() + str(getattr(exc, "server_message", "")).lower():
                     log.info("Provider rejected response_format; falling back to prompt-only JSON")
                     self._json_mode = False
                     continue
@@ -141,3 +142,7 @@ class LLMClient:
                 return schema.model_validate(extract_json(content))
             except (json.JSONDecodeError, ValidationError) as exc:
                 raise LLMError(ErrorCode.LLM_BAD_OUTPUT, f"LLM returned invalid output twice: {str(exc)[:300]}") from exc
+
+    def complete_text(self, messages: list[dict], metric: StageMetric, max_tokens: int = 2000) -> str:
+        """Plain-text completion (used for the vision model's page transcription). Same retries and errors."""
+        return self._call(messages, max_tokens, metric, temperature=0.0, json_mode=False)

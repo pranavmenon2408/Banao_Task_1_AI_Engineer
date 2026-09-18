@@ -23,6 +23,7 @@ from pydantic import BaseModel, ValidationError, model_validator
 
 from app.config import get_scoring_config, get_settings
 from app.llm import LLMError
+from app.ocr import OcrEngine
 from app.parsing import DocumentError, check_text, extract_text, normalize
 from app.pipeline import ScoringPipeline
 from app.schemas import (ApiError, ErrorCode, RescoreRequest, RescoreResult, ScoreResult, WeightOverrides)
@@ -85,6 +86,11 @@ def get_pipeline() -> ScoringPipeline:
     return ScoringPipeline()
 
 
+@lru_cache
+def get_ocr() -> OcrEngine:
+    return OcrEngine(get_scoring_config().ocr)
+
+
 class ScoreForm(BaseModel):
     """Validates the non-file parts of the multipart form."""
     jd_text: str | None = None
@@ -134,14 +140,15 @@ def score(resume: UploadFile = File(..., description="Resume: PDF, DOCX or TXT")
     warnings: list[str] = []
     try:
         cv = extract_text(resume.filename or "resume", resume.file.read(), allowed=ALLOWED_TYPES,
-                          min_chars=cfg.limits.min_resume_chars, max_chars=cfg.limits.max_resume_chars)
+                          min_chars=cfg.limits.min_resume_chars, max_chars=cfg.limits.max_resume_chars,
+                          ocr=get_ocr())
         warnings += cv.warnings
     except DocumentError as exc:
         raise _err(422, exc.code, exc.message, exc.hint, field="resume")
     try:
         if form.has_jd_file:
             jd = extract_text(jd_file.filename, jd_file.file.read(), allowed=ALLOWED_TYPES, min_chars=100,
-                              max_chars=cfg.limits.max_jd_chars, purpose="job description")
+                              max_chars=cfg.limits.max_jd_chars, purpose="job description", ocr=get_ocr())
         else:
             jd = check_text(normalize(form.jd_text), min_chars=100, max_chars=cfg.limits.max_jd_chars,
                             purpose="job description")
@@ -150,7 +157,9 @@ def score(resume: UploadFile = File(..., description="Resume: PDF, DOCX or TXT")
         raise _err(422, exc.code, exc.message, exc.hint, field="jd")
 
     try:
-        return get_pipeline().run(cv.text, jd.text, overrides=form.weights, warnings=warnings)
+        return get_pipeline().run(cv.text, jd.text, overrides=form.weights, warnings=warnings,
+                                  parse_stages=[m for m in (cv.metric, jd.metric) if m],
+                                  extraction={"resume": cv.method, "job_description": jd.method or "text"})
     except LLMError as exc:
         log.error("LLM failure: %s %s", exc.code, exc.message)
         raise _err(LLM_STATUS.get(exc.code, 502), exc.code, exc.message,
