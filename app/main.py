@@ -1,0 +1,160 @@
+"""FastAPI backend.
+
+    POST /api/v1/score     multipart: resume file + (jd_file | jd_text) [+ weights JSON]  -> ScoreResult
+    POST /api/v1/rescore   JSON: existing per-criterion results + new weights (no LLM)    -> RescoreResult
+    GET  /api/v1/config    current scoring configuration (weights, bands, limits)
+    GET  /health           liveness + whether the LLM is configured
+
+Every error leaves as the same ApiError shape ({code, message, hint, field}) so clients can branch on
+`code` instead of parsing messages.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import time
+import uuid
+from functools import lru_cache
+
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ValidationError, model_validator
+
+from app.config import get_scoring_config, get_settings
+from app.llm import LLMError
+from app.parsing import DocumentError, check_text, extract_text, normalize
+from app.pipeline import ScoringPipeline
+from app.schemas import (ApiError, ErrorCode, RescoreRequest, RescoreResult, ScoreResult, WeightOverrides)
+from app.scoring import aggregate
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("api")
+
+app = FastAPI(title="Resume-JD Fit Scorer", version="1.0.0",
+              description="Two-agent resume vs job-description fit assessment with per-criterion, evidence-grounded scoring.")
+
+ALLOWED_TYPES = frozenset({"pdf", "docx", "txt"})
+LLM_STATUS = {ErrorCode.LLM_UNAVAILABLE: 503, ErrorCode.LLM_BAD_OUTPUT: 502, ErrorCode.CONFIG_ERROR: 500}
+
+
+class ApiException(Exception):
+    def __init__(self, status: int, error: ApiError):
+        self.status, self.error = status, error
+
+
+def _err(status: int, code: ErrorCode, message: str, hint: str | None = None, field: str | None = None):
+    return ApiException(status, ApiError(code=code, message=message, hint=hint, field=field))
+
+
+@app.exception_handler(ApiException)
+async def _api_exc(_: Request, exc: ApiException):
+    return JSONResponse(status_code=exc.status, content={"error": exc.error.model_dump(mode="json")})
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exc(_: Request, exc: RequestValidationError):
+    first = exc.errors()[0] if exc.errors() else {}
+    field = ".".join(str(p) for p in first.get("loc", [])[1:]) or None
+    err = ApiError(code=ErrorCode.INVALID_REQUEST, message=first.get("msg", "Invalid request"), field=field)
+    return JSONResponse(status_code=422, content={"error": err.model_dump(mode="json")})
+
+
+@app.middleware("http")
+async def _timing(request: Request, call_next):
+    rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    t = time.perf_counter()
+    response = await call_next(request)
+    ms = (time.perf_counter() - t) * 1000
+    response.headers["x-request-id"] = rid
+    response.headers["x-latency-ms"] = f"{ms:.0f}"
+    log.info("%s %s -> %s in %.0f ms [%s]", request.method, request.url.path, response.status_code, ms, rid)
+    return response
+
+
+@lru_cache
+def get_pipeline() -> ScoringPipeline:
+    return ScoringPipeline()
+
+
+class ScoreForm(BaseModel):
+    """Validates the non-file parts of the multipart form."""
+    jd_text: str | None = None
+    has_jd_file: bool = False
+    weights: WeightOverrides | None = None
+
+    @model_validator(mode="after")
+    def _one_jd_source(self):
+        has_text = bool(self.jd_text and self.jd_text.strip())
+        if has_text == self.has_jd_file:
+            raise ValueError("Provide the job description either as jd_text or as jd_file, not both and not neither.")
+        if has_text and len(self.jd_text.strip()) < 100:
+            raise ValueError("jd_text is too short to extract criteria from (minimum 100 characters).")
+        return self
+
+
+@app.get("/health")
+def health():
+    s = get_settings()
+    return {"status": "ok", "model": s.hf_model, "provider": s.hf_provider, "llm_configured": bool(s.hf_token)}
+
+
+@app.get("/api/v1/config")
+def config():
+    return get_scoring_config().model_dump()
+
+
+@app.post("/api/v1/score", response_model=ScoreResult, responses={
+    422: {"model": ApiError, "description": "Unreadable document or invalid request"},
+    502: {"model": ApiError, "description": "LLM returned unusable output"},
+    503: {"model": ApiError, "description": "LLM provider unavailable"}})
+def score(resume: UploadFile = File(..., description="Resume: PDF, DOCX or TXT"),
+          jd_file: UploadFile | None = File(None, description="Job description file: PDF, DOCX or TXT"),
+          jd_text: str | None = Form(None, description="Job description as plain text"),
+          weights: str | None = Form(None, description="Optional JSON WeightOverrides")):
+    cfg = get_scoring_config()
+    try:
+        form = ScoreForm(jd_text=jd_text, has_jd_file=jd_file is not None and bool(jd_file.filename),
+                         weights=json.loads(weights) if weights else None)
+    except json.JSONDecodeError:
+        raise _err(422, ErrorCode.INVALID_REQUEST, "weights must be valid JSON.", field="weights")
+    except ValidationError as exc:
+        e = exc.errors()[0]
+        raise _err(422, ErrorCode.INVALID_REQUEST, e["msg"].removeprefix("Value error, "),
+                   field=".".join(map(str, e["loc"])) or "jd")
+
+    warnings: list[str] = []
+    try:
+        cv = extract_text(resume.filename or "resume", resume.file.read(), allowed=ALLOWED_TYPES,
+                          min_chars=cfg.limits.min_resume_chars, max_chars=cfg.limits.max_resume_chars)
+        warnings += cv.warnings
+    except DocumentError as exc:
+        raise _err(422, exc.code, exc.message, exc.hint, field="resume")
+    try:
+        if form.has_jd_file:
+            jd = extract_text(jd_file.filename, jd_file.file.read(), allowed=ALLOWED_TYPES, min_chars=100,
+                              max_chars=cfg.limits.max_jd_chars, purpose="job description")
+        else:
+            jd = check_text(normalize(form.jd_text), min_chars=100, max_chars=cfg.limits.max_jd_chars,
+                            purpose="job description")
+        warnings += jd.warnings
+    except DocumentError as exc:
+        raise _err(422, exc.code, exc.message, exc.hint, field="jd")
+
+    try:
+        return get_pipeline().run(cv.text, jd.text, overrides=form.weights, warnings=warnings)
+    except LLMError as exc:
+        log.error("LLM failure: %s %s", exc.code, exc.message)
+        raise _err(LLM_STATUS.get(exc.code, 502), exc.code, exc.message,
+                   "The language model is temporarily unavailable; retry in a minute." if exc.code == ErrorCode.LLM_UNAVAILABLE else None)
+
+
+@app.post("/api/v1/rescore", response_model=RescoreResult)
+def rescore(req: RescoreRequest):
+    """Re-weight without re-running the LLM: weights are configuration, levels are judgements."""
+    criteria = [c.model_copy(deep=True) for c in req.criteria]
+    if not criteria:
+        raise _err(422, ErrorCode.INVALID_REQUEST, "criteria must not be empty.", field="criteria")
+    overall, label, knockout, weights = aggregate(criteria, get_scoring_config(), req.overrides)
+    return RescoreResult(overall_score=overall, recommendation=label, knockout_triggered=knockout,
+                         criteria=criteria, weights_used=weights)

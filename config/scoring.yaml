@@ -2,6 +2,16 @@
 # number lives here, so recruiters can tune it without touching code or prompts.
 # The LLM never produces the overall score; it only assigns a 0-4 level per criterion.
 
+# How the profile and criteria are shown to the scorer. "markdown" = headed sections and bullets,
+# "json" = raw JSON dumps. Compared with scripts/calibrate.py --input-format; see docs/DEVLOG.md.
+scorer_input_format: markdown
+
+# Scorer sampling. samples=1 -> a single call at scorer_temperature. samples>1 -> that many calls in
+# parallel and the MEDIAN level per criterion is kept (self-consistency). Only affects the scorer;
+# both extraction steps always run at LLM_TEMPERATURE (0). See docs/DEVLOG.md for the comparison.
+scorer_temperature: 0.0
+scorer_samples: 1
+
 # Each criterion's weight = importance_weight * category_weight
 importance_weights:
   must_have: 3.0

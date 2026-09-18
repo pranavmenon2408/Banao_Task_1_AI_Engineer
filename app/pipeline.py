@@ -16,7 +16,7 @@ from app.cache import JsonCache, text_hash
 from app.config import ROOT, ScoringConfig, get_scoring_config, get_settings
 from app.grounding import Grounder
 from app.llm import LLMClient
-from app.prompts import PROMPT_VERSION
+from app.prompts import CRITERIA_PROMPT_VERSION, PROMPT_VERSION
 from app.schemas import CriteriaList, ResumeProfile, RunMeta, ScoreResult, StageMetric, WeightOverrides
 from app.scoring import aggregate, build_scored, strengths_and_gaps
 
@@ -35,17 +35,19 @@ def _stage(stages: list[StageMetric], name: str):
 
 
 class ScoringPipeline:
-    def __init__(self, llm: LLMClient | None = None, cfg: ScoringConfig | None = None, use_cache: bool = True):
+    def __init__(self, llm: LLMClient | None = None, cfg: ScoringConfig | None = None,
+                 cache_criteria: bool = True, cache_profiles: bool = True):
         self.llm = llm or LLMClient()
         self.cfg = cfg or get_scoring_config()
-        self.use_cache = use_cache
+        self.cache_criteria = cache_criteria
+        self.cache_profiles = cache_profiles
         self.criteria_cache = JsonCache("criteria")
         self.profile_cache = JsonCache("profiles")
 
     def get_criteria(self, jd_text: str, stages: list[StageMetric]) -> tuple[CriteriaList, str]:
-        key = text_hash(jd_text, self.llm.model, PROMPT_VERSION, str(self.cfg.limits.max_criteria))
+        key = text_hash(jd_text, self.llm.model, CRITERIA_PROMPT_VERSION, str(self.cfg.limits.max_criteria))
         with _stage(stages, "jd_criteria_extraction") as m:
-            cached = self.criteria_cache.get(key) if self.use_cache else None
+            cached = self.criteria_cache.get(key) if self.cache_criteria else None
             if cached:
                 m.cache_hit = True
                 return CriteriaList.model_validate(cached), key
@@ -56,7 +58,7 @@ class ScoringPipeline:
     def get_profile(self, resume_text: str, stages: list[StageMetric]) -> tuple[ResumeProfile, int]:
         key = text_hash(resume_text, self.llm.model, PROMPT_VERSION, str(self.cfg.limits.resume_chunk_tokens))
         with _stage(stages, "resume_profile_extraction") as m:
-            cached = self.profile_cache.get(key) if self.use_cache else None
+            cached = self.profile_cache.get(key) if self.cache_profiles else None
             if cached:
                 m.cache_hit = True
                 return ResumeProfile.model_validate(cached["profile"]), cached["chunks"]
@@ -73,7 +75,8 @@ class ScoringPipeline:
         criteria, jd_hash = self.get_criteria(jd_text, stages)
         profile, n_chunks = self.get_profile(resume_text, stages)
         with _stage(stages, "criterion_scoring") as m:
-            assessments = score_profile(self.llm, profile, criteria, m)
+            assessments = score_profile(self.llm, profile, criteria, m, self.cfg.scorer_input_format,
+                                        self.cfg.scorer_temperature, self.cfg.scorer_samples)
 
         with _stage(stages, "grounding_and_aggregation"):
             resume_g, jd_g = Grounder(resume_text), Grounder(jd_text)

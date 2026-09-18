@@ -92,6 +92,7 @@ class CriterionAssessment(BaseModel):
     reasoning: str
     resume_evidence: list[str] = Field(default_factory=list)
     gaps: str = ""
+    agreement: float = Field(1.0, description="Share of scorer samples that chose this level (1.0 when samples=1)")
 
     @field_validator("level", mode="before")
     @classmethod
@@ -123,6 +124,7 @@ class ScoredCriterion(BaseModel):
     evidence: list[EvidenceCheck]
     grounded: bool
     jd_grounded: bool
+    agreement: float = 1.0
     flags: list[str] = Field(default_factory=list)
 
 

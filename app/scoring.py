@@ -33,11 +33,13 @@ def build_scored(criterion: Criterion, a: CriterionAssessment, evidence: list[Ev
                      else "No evidence quoted for a non-zero level; level reduced")
     elif any(not e.found for e in evidence):
         flags.append("Some quoted evidence was not found verbatim in the resume")
+    if a.agreement < 0.6:
+        flags.append(f"Low scorer agreement ({a.agreement:.0%} of samples chose this level)")
     if not jd_grounded:
         flags.append("Requirement phrase not found verbatim in the job description")
     return ScoredCriterion(criterion=criterion, raw_level=a.level, final_level=final, points=0, weight=0,
                            weighted_contribution=0, reasoning=a.reasoning, gaps=a.gaps, evidence=evidence,
-                           grounded=grounded, jd_grounded=jd_grounded, flags=flags)
+                           grounded=grounded, jd_grounded=jd_grounded, agreement=a.agreement, flags=flags)
 
 
 def aggregate(scored: list[ScoredCriterion], cfg: ScoringConfig,

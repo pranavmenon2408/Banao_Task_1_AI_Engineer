@@ -61,10 +61,11 @@ def _status(exc: Exception) -> int | None:
 
 
 class LLMClient:
-    def __init__(self, settings: Settings | None = None, client: InferenceClient | None = None):
+    def __init__(self, settings: Settings | None = None, client: InferenceClient | None = None,
+                 model: str | None = None, provider: str | None = None):
         self.s = settings or get_settings()
-        self.model = self.s.hf_model
-        self.provider = self.s.hf_provider
+        self.model = model or self.s.hf_model
+        self.provider = provider or self.s.hf_provider
         self._client = client
         self._json_mode = True
 
@@ -76,10 +77,12 @@ class LLMClient:
             self._client = InferenceClient(provider=self.provider, api_key=self.s.hf_token, timeout=self.s.llm_timeout_s)
         return self._client
 
-    def _call(self, messages: list[dict], max_tokens: int, metric: StageMetric) -> str:
+    def _call(self, messages: list[dict], max_tokens: int, metric: StageMetric, temperature: float | None = None) -> str:
         attempt = 0
         while True:
-            kwargs = dict(model=self.model, max_tokens=max_tokens, temperature=self.s.llm_temperature, seed=self.s.llm_seed)
+            temp = self.s.llm_temperature if temperature is None else temperature
+            # A fixed seed with temperature > 0 would make every "sample" identical on providers that honour it.
+            kwargs = dict(model=self.model, max_tokens=max_tokens, temperature=temp, seed=self.s.llm_seed if temp == 0 else None)
             if self._json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
             try:
@@ -112,9 +115,10 @@ class LLMClient:
                 metric.retries += 1
                 time.sleep(delay)
 
-    def complete_json(self, system: str, user: str, schema: type[T], metric: StageMetric, max_tokens: int = 2500) -> T:
+    def complete_json(self, system: str, user: str, schema: type[T], metric: StageMetric, max_tokens: int = 2500,
+                      temperature: float | None = None) -> T:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        content = self._call(messages, max_tokens, metric)
+        content = self._call(messages, max_tokens, metric, temperature)
         try:
             return schema.model_validate(extract_json(content))
         except (json.JSONDecodeError, ValidationError) as first_err:
@@ -127,7 +131,7 @@ class LLMClient:
                     f"Error: {str(first_err)[:800]}\n"
                     "Reply again with ONLY the corrected JSON object, no prose, no code fences.")},
             ]
-            content = self._call(messages, max_tokens, metric)
+            content = self._call(messages, max_tokens, metric, temperature)
             try:
                 return schema.model_validate(extract_json(content))
             except (json.JSONDecodeError, ValidationError) as exc:

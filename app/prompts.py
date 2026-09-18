@@ -1,7 +1,8 @@
 """All prompts in one place. Bump PROMPT_VERSION when any prompt changes: it is part of the cache
 key, so cached criteria/profiles from an older prompt are never reused."""
 
-PROMPT_VERSION = "v3"
+PROMPT_VERSION = "v5"          # resume extraction + scoring prompts
+CRITERIA_PROMPT_VERSION = "c1"  # JD criteria prompt (separate so scorer changes keep cached criteria)
 
 # ---------------------------------------------------------------------------------------------
 # Agent 1: resume -> structured profile
@@ -113,6 +114,9 @@ GROUNDING RULES:
 - resume_evidence: 1-3 short quotes copied EXACTLY (character for character) from the candidate profile's
   highlights, skills, education, projects, certifications or other fields. No paraphrasing, no ellipses, max 30 words
   each. Level 0 -> empty list.
+- NEVER quote the hiring criteria or job description as evidence. If the only text mentioning a skill is the
+  criterion itself, the candidate has no evidence for it: level 0.
+- A skill that appears only in the "skills" list is quoted as the single skill name (e.g. "Kubernetes").
 - reasoning: 1-3 sentences that connect the quoted evidence to the criterion's JD requirement. Mention the
   requirement and the evidence explicitly. No generic praise.
 - gaps: what is missing for the next level up ("" if level 4).
@@ -121,10 +125,12 @@ Return ONLY a JSON object with one assessment for EVERY criterion id, in the sam
 {"assessments": [{"criterion_id": string, "level": integer 0-4, "reasoning": string,
                   "resume_evidence": [string], "gaps": string}]}"""
 
-SCORER_USER = """Hiring criteria (from the job description):
-{criteria_json}
+SCORER_USER = """<<<CRITERIA (requirements from the job description; NEVER quote these as evidence)
+{criteria}
+CRITERIA>>>
 
-Candidate profile (extracted from the resume; quote evidence from here):
-{profile_json}
+<<<CANDIDATE PROFILE (extracted from the resume; quote evidence ONLY from here)
+{profile}
+CANDIDATE PROFILE>>>
 
-Assess every criterion. Return JSON only."""
+Assess every criterion id listed above. Return JSON only."""
