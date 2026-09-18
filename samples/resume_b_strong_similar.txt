@@ -1,0 +1,31 @@
+Karthik Menon
+karthik.menon@example.com · Pune · linkedin.com/in/karthikmenon
+
+Profile
+Python backend developer, 6+ years, most recently on card payments infrastructure.
+
+Technical Skills
+Languages: Python, SQL, Go (basic)
+Frameworks: Flask, FastAPI
+Data: PostgreSQL, MySQL, Redis
+Messaging: Apache Kafka
+Infra: Docker, AWS (EKS, Lambda, RDS), Terraform
+Monitoring: Grafana, OpenTelemetry
+
+Work Experience
+
+PayGrid Technologies - Senior Backend Engineer
+Jan 2022 to Present
+* Own the card-authorisation service (Python, FastAPI) processing about 3.5 million transactions daily.
+* Built Kafka consumers that stream settlement events to the reconciliation service.
+* Redesigned PostgreSQL schemas for the merchant ledger and added indexes that halved slow-query count.
+* Run design reviews and mentor two engineers on the team.
+
+CloudKart - Backend Engineer
+Jun 2018 to Dec 2021
+* Developed order and inventory REST APIs with Flask and PostgreSQL.
+* Packaged services as Docker images and deployed them to AWS EKS.
+* Participated in on-call rotation and incident postmortems.
+
+Education
+Bachelor of Technology, Information Technology - College of Engineering Pune (2018)

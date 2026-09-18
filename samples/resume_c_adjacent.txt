@@ -1,0 +1,25 @@
+Rohan Verma
+Full-Stack Developer
+rohan.verma@example.com | Hyderabad
+
+SUMMARY
+Full-stack developer with 3 years of experience building web applications with React and Node.js.
+
+EXPERIENCE
+Full-Stack Developer, ShopSmart (Aug 2022 - Present)
+- Built customer-facing React dashboards and Node.js (Express) APIs for an e-commerce platform.
+- Wrote MongoDB aggregation pipelines for sales reports.
+- Wrote Python scripts to automate CSV data imports.
+
+Junior Web Developer, PixelCraft Studio (Jun 2021 - Jul 2022)
+- Developed landing pages with HTML, CSS and JavaScript.
+- Integrated Razorpay checkout into client websites.
+
+EDUCATION
+B.Sc. Mathematics, Osmania University, 2021
+
+SKILLS
+JavaScript, TypeScript, React, Node.js, Express, MongoDB, Python (scripting), Git, Heroku
+
+CERTIFICATIONS
+AWS Certified Cloud Practitioner (2023)

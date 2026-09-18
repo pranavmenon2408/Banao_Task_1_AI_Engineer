@@ -1,0 +1,27 @@
+ANANYA RAO
+Senior Software Engineer | Backend & Distributed Systems
+Bengaluru, India | ananya.rao@example.com | +91 98450 00000
+
+SUMMARY
+Backend engineer with 6 years of experience building payment and lending services in Python.
+
+EXPERIENCE
+Senior Software Engineer, Razorfin Payments (Mar 2022 - Present)
+- Designed and built the refunds and settlement APIs in Python and FastAPI, handling 4M requests per day.
+- Introduced Kafka-based event pipeline for transaction status updates, cutting reconciliation lag from 6 hours to 15 minutes.
+- Optimised PostgreSQL queries and partitioned the ledger table, reducing p95 latency by 40%.
+- Mentored three junior engineers and led design reviews for the payouts team.
+
+Software Engineer, LendQuick (Jul 2019 - Feb 2022)
+- Built loan-disbursal microservices with Django REST Framework and PostgreSQL.
+- Containerised services with Docker and deployed them to AWS ECS; set up CI/CD with GitHub Actions.
+- Implemented RabbitMQ workers for asynchronous KYC verification.
+
+Associate Engineer, Infosys (Jul 2018 - Jun 2019)
+- Maintained internal Java reporting tools and wrote SQL reports.
+
+EDUCATION
+B.E. Computer Science, RV College of Engineering, 2018
+
+SKILLS
+Python, FastAPI, Django, PostgreSQL, Redis, Kafka, RabbitMQ, Docker, AWS (ECS, RDS, S3), GitHub Actions, Prometheus, Grafana

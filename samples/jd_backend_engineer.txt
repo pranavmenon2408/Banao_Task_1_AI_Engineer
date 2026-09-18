@@ -1,0 +1,28 @@
+Senior Backend Engineer (Python) - Payments Platform
+
+About the role
+We are hiring a Senior Backend Engineer to build and scale the services behind our payments platform, which
+processes over 5 million transactions a day for merchants across India and Southeast Asia.
+
+What you'll do
+- Design, build and operate high-throughput REST APIs and event-driven services in Python.
+- Own services end to end: design reviews, implementation, testing, deployment and on-call.
+- Model data and tune queries in PostgreSQL for correctness and performance.
+- Work with product and compliance teams on reconciliation, refunds and settlement flows.
+- Mentor junior engineers and raise the bar through code review.
+
+Requirements
+- 5+ years of professional software engineering experience, with at least 3 years building backend services.
+- Strong proficiency in Python and a modern web framework (FastAPI, Django or Flask).
+- Solid experience with PostgreSQL or another relational database, including schema design and query optimisation.
+- Experience with message queues or streaming systems such as Kafka or RabbitMQ.
+- Hands-on experience deploying containerised services with Docker on a cloud provider (AWS preferred).
+- Bachelor's degree in Computer Science or a related field, or equivalent practical experience.
+
+Nice to have
+- Experience in payments, fintech or banking systems.
+- Familiarity with Kubernetes.
+- Experience with observability tooling (Prometheus, Grafana, OpenTelemetry).
+
+What we offer
+Competitive salary, ESOPs, flexible hybrid work from Bengaluru, and a learning budget.
