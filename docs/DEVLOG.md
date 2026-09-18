@@ -105,3 +105,57 @@ All with the new rubric and points. Reports are in `reports/`. Variants 3-5 ran 
   about $0.003 per resume.
 - Chosen default: **sectioned, markdown, T=0, 1 sample**. The latency outlier in run 3 (116-136 s) was provider-side
   slowness during that window, not the variant.
+
+## 6. Correction: sectioned scoring is not more stable, only faster and more focused
+
+Entry 5 compared sectioned vs single unfairly: the single run happened *before* the fragment-grounding fix
+(its worst range, 3.8, came from a false "ungrounded" penalty) and without the section rules or code-computed years.
+Re-run as a fair A/B: both modes use the same rules and computed years, Agent 1's profile is frozen (cached) so only
+the scorer varies, both run **at the same time** (same provider load), 5 repeats each.
+
+| | single call | sectioned |
+|---|---|---|
+| mean A / B / C | 93.9 / 88.8 / 28.7 | 93.3 / 93.9 / 29.9 |
+| \|A - B\| | 5.1 | 0.6 |
+| worst range (same resume, 5 runs) | 4.5 | 7.5 |
+| criteria whose level changed across runs | 4 | 4 |
+| latency per resume | ~31 s | ~22 s |
+| tokens per resume | ~2.8k | ~6.1k |
+
+Stability is a tie (sectioned is slightly worse on B). Sectioned is ~30% faster (4 small parallel calls) and applies
+section rules more reliably: B's "deployed them to AWS EKS" got Kubernetes 2-3 in sectioned, but 1 in all 5 single
+runs even though the single prompt contains the same "EKS = managed Kubernetes" rule, probably because the rule is buried in one long
+prompt. Kept sectioned for speed and focus. The cost is 2.2x tokens (~$0.002 per resume at ~$0.37/1M).
+
+## 7. Multi-column and scanned PDFs (observed, then fixed)
+
+Built `samples/resume_a_two_column.pdf` (resume A's exact content as sidebar + main column, drawn row by row like
+many resume builders) and `samples/resume_a_scanned.pdf` (A rendered as a slightly rotated, noisy 150-dpi image).
+
+**Two-column, before (pypdf):** the columns were interleaved line by line, e.g. "...transaction status / Kafka /
+updates, cutting reconciliation lag...". Agent 1 mostly repaired it (3 roles, all bullets correct; score 93.3), but
+the raw text no longer contained the bullets verbatim: extracted highlights matched the resume text at 0.93-0.96
+instead of 1.00, eating into the 0.80 grounding margin. Longer sidebar text would do more damage.
+**Fix:** PyMuPDF with our own reading order. PyMuPDF merges text on the same baseline across columns into one line,
+so lines are split at wide span gaps first; then a gutter must have >= 8% of page text and >= 5 lines per side, with
+<= 15% of lines crossing it. A unit test caught my first version splitting a normal resume with right-aligned dates
+into two columns (shares were measured against narrow lines only), which is why the crossing rule exists.
+
+**Scanned, before:** rejected outright as `NO_TEXT_LAYER`, although it is perfectly legible.
+**Fix:** OCR chain, with the order chosen by measured cost:
+
+| Engine (1 page) | Time | Lines exact | Cost |
+|---|---|---|---|
+| Tesseract @100 / 150 / 200 dpi | 0.55-0.65 s | 94% | local, free |
+| **Tesseract @300 dpi** | ~0.85 s (1.5 s incl. render in the API) | **100%** | local, free |
+| Llama-4-Scout-17B (HF) | 6.0-6.3 s | 100% | ~2.8k tokens |
+| Qwen2.5-VL-72B (HF) | 13.1 s | 100% | ~3.1k tokens |
+| gemma-3-27b (HF) | 36.6 s | 94% | ~0.6k tokens |
+| Qwen2.5-VL-7B | not served by any provider | | |
+
+Tesseract runs first; the vision model only runs if Tesseract is missing, errors, or reports confidence < 70
+(the clean scan scored ~94). Pages are capped at 4 and VLM pages run in parallel.
+
+**After, same resume through the API:** text PDF 93.3, two-column PDF 93.3, scanned via Tesseract 93.3, scanned via
+the VLM (Tesseract disabled) 93.3. The blank "scan" (rectangles, no letters) now fails in 2.4 s with the reason
+("Tesseract read 0 chars ...; Vision model returned 0 chars").

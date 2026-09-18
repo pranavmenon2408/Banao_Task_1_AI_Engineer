@@ -9,7 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Tesseract for OCR of scanned resumes (the vision-model fallback needs no system packages).
-RUN apt-get update     && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
 
 # Dependencies first so code changes don't invalidate the pip layer.
 COPY requirements.txt .
