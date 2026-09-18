@@ -18,9 +18,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
 
     hf_token: str = ""
-    hf_model: str = "Qwen/Qwen2.5-72B-Instruct"
+    hf_model: str = "meta-llama/Llama-3.3-70B-Instruct"
     hf_provider: str = "auto"
     hf_vlm_model: str = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+    hf_vlm_provider: str = "auto"  # separate from hf_provider: providers host different models
     tesseract_cmd: str = ""  # path to tesseract binary if it is not on PATH
     llm_temperature: float = 0.0
     llm_seed: int = 42

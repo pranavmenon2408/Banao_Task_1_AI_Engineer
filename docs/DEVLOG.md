@@ -159,3 +159,33 @@ Tesseract runs first; the vision model only runs if Tesseract is missing, errors
 **After, same resume through the API:** text PDF 93.3, two-column PDF 93.3, scanned via Tesseract 93.3, scanned via
 the VLM (Tesseract disabled) 93.3. The blank "scan" (rectangles, no letters) now fails in 2.4 s with the reason
 ("Tesseract read 0 chars ...; Vision model returned 0 chars").
+
+## 8. Provider outage -> switched to Llama-3.3-70B, which exposed a routing bug
+
+**Outage.** A scoring request from the UI failed in 382 ms with `model_not_supported`: "Qwen/Qwen2.5-72B-Instruct is not
+supported by any provider you have enabled". The same API process had scored fine two hours earlier, so nothing local
+had changed. Probing providers directly: novita (which `auto` had been using) was failing Hugging Face's own health
+check and timed out; featherless-ai served the model but isn't in the account's enabled list; others don't host it.
+Pinning `HF_PROVIDER=featherless-ai` "worked" but was unusable: sectioned scoring's 4 parallel calls got
+**429 Too Many Requests**, successful calls took ~90 s, and two returned invalid JSON (repair turns). One request ran
+past 5 minutes. Also, featherless doesn't host the OCR vision model, so the VLM got its own `HF_VLM_PROVIDER` (auto).
+My error message was also wrong: it labelled `model_not_supported` as "temporarily unavailable, retry in a minute",
+which retrying can never fix.
+
+**Switch.** `HF_MODEL=meta-llama/Llama-3.3-70B-Instruct` on `auto` (answered in 0.6 s). First calibration run:
+A 86.6/86.6/84.3, B 88.1 x3, C 30.5 x3, but **Observability = 0 for both A and B**, although A lists Prometheus and Grafana
+and B lists Grafana and OpenTelemetry. Cause: Llama categorised "Observability Tooling" as an *experience* criterion (Qwen had said
+*skill*), and in sectioned mode the experience scorer only saw roles and dates, not the skills list. Any
+miscategorised criterion loses its evidence. Since the fair A/B (entry 6) showed sectioning helps through speed and
+focused rules, not through hiding sections, every section except education now also sees skills and projects.
+
+**After the fix** (Llama-3.3-70B, sectioned, T=0, 3 repeats, profile re-extracted each run):
+
+| Resume | Scores | Latency |
+|---|---|---|
+| A | 93.1, 93.1, 93.1 | ~18 s |
+| B | 92.4, 92.4, 92.4 | ~18 s |
+| C | 31.7, 31.7, 31.7 | ~14 s |
+
+|A - B| = 0.7, no run-to-run change at all, no ungrounded quotes. Through the API, the text, two-column and scanned
+(Tesseract) versions of A all score 93.1 with identical per-criterion levels, in 8-23 s.

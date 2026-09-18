@@ -73,7 +73,7 @@ class OcrEngine:
     @property
     def vlm(self) -> LLMClient:
         if self._vlm is None:
-            self._vlm = LLMClient(model=self.s.hf_vlm_model)
+            self._vlm = LLMClient(model=self.s.hf_vlm_model, provider=self.s.hf_vlm_provider)
         return self._vlm
 
     # ------------------------------------------------------------------ engines

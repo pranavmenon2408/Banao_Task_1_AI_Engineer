@@ -1,7 +1,7 @@
 """All prompts in one place. Bump PROMPT_VERSION when any prompt changes: it is part of the cache
 key, so cached criteria/profiles from an older prompt are never reused."""
 
-PROMPT_VERSION = "v7"       # resume extraction + scoring prompts
+PROMPT_VERSION = "v8"       # resume extraction + scoring prompts
 CRITERIA_PROMPT_VERSION = "c1"  # JD criteria prompt (separate so scorer changes keep cached criteria)
 
 # ---------------------------------------------------------------------------------------------
@@ -188,9 +188,13 @@ SECTION_FOCUS = {
 # criterion category -> section, and which resume parts each section's scorer sees
 CATEGORY_SECTION = {"experience": "experience", "skill": "skills", "certification": "skills",
                     "education": "education", "domain": "domain", "soft_skill": "domain"}
+# Every section except education also sees the skills list and projects: the criteria extractor's category
+# is a model judgement, and a criterion filed under the wrong section must still see its evidence. (Observed:
+# Llama-3.3 filed "Observability tooling" under experience; that scorer couldn't see "Prometheus, Grafana" in
+# the skills list and scored 0. See docs/DEVLOG.md.) The section's *rules* are what stay focused.
 SECTION_PARTS = {
-    "experience": frozenset({"header", "experience"}),
+    "experience": frozenset({"header", "experience", "projects", "skills"}),
     "skills": frozenset({"experience", "projects", "skills", "certifications"}),
     "education": frozenset({"education", "certifications"}),
-    "domain": frozenset({"header", "experience", "projects", "other"}),
+    "domain": frozenset({"header", "experience", "projects", "skills", "other"}),
 }

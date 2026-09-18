@@ -26,7 +26,9 @@ def test_sectioned_routes_criteria_to_matching_resume_sections():
     jobs = {tuple(c.id for c in crits): (system, text) for system, text, crits in _jobs(PROFILE, cs, "sectioned", "markdown")}
     assert set(jobs) == {("c1",), ("c2", "c3"), ("c4",), ("c5",)}
     exp_sys, exp_text = jobs[("c1",)]
-    assert "SECTION FOCUS" in exp_sys and "EXPERIENCE criteria" in exp_sys and "computed in code" in exp_text and "## SKILLS" not in exp_text
+    assert "SECTION FOCUS" in exp_sys and "EXPERIENCE criteria" in exp_sys and "computed in code" in exp_text
+    # a miscategorised criterion must still see the skills list
+    assert "## SKILLS" in exp_text and "## EDUCATION" not in exp_text
     _, skills_text = jobs[("c2", "c3")]
     assert "## SKILLS" in skills_text and "## EXPERIENCE" in skills_text and "## EDUCATION" not in skills_text
     _, edu_text = jobs[("c4",)]

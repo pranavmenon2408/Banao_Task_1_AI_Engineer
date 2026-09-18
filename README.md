@@ -90,7 +90,7 @@ Then open http://localhost:8501.
 
 1. **Job description:** upload a PDF / DOCX / TXT, or paste the text.
 2. **Resume:** upload a PDF / DOCX / TXT (upload only).
-3. Click **Assess fit**. A run takes roughly 30–60 s with the default model.
+3. Click **Assess fit**. A run takes roughly 10–25 s with the default model.
 4. Use the sidebar sliders to change the weights. The score updates instantly without calling the LLM again.
 
 Try it with the files in `samples/`. `resume_a_two_column.pdf` and `resume_a_scanned.pdf` are the same resume as
@@ -116,7 +116,7 @@ Errors always come back as `{"error": {"code", "message", "hint", "field"}}`. Fo
 
 ### Configuration
 
-- **`.env`:** token, model (`HF_MODEL`, default `Qwen/Qwen2.5-72B-Instruct`), OCR backup model (`HF_VLM_MODEL`,
+- **`.env`:** token, model (`HF_MODEL`, default `meta-llama/Llama-3.3-70B-Instruct`), OCR backup model (`HF_VLM_MODEL`,
   default `meta-llama/Llama-4-Scout-17B-16E-Instruct`), `TESSERACT_CMD`, provider, timeouts, retries.
 - **`config/scoring.yaml`:** importance and category weights, points per rubric level, knockout rule,
   recommendation bands, grounding threshold, scoring mode, scorer temperature and samples, OCR settings
@@ -151,7 +151,9 @@ python -m scripts.calibrate --repeats 3   # real LLM: scores 3 sample resumes 3x
 - OCR'd text is trusted as-is. A vision model could "clean up" or invent words, and the recruiter only gets a warning.
   Tesseract is set up for English only.
 - Calibration is only checked on **3 hand-written samples for one JD**, which isn't a real accuracy evaluation.
-- One run takes about 20–60 s, which depends on the Hugging Face provider's speed.
+- Depends on Hugging Face providers: if the provider serving `HF_MODEL` goes down, requests fail with
+  `model_not_supported` (currently mislabelled as a temporary error). Switch `HF_MODEL`/`HF_PROVIDER` in `.env`.
+  The calibration history in `docs/DEVLOG.md` was measured on Qwen2.5-72B before it went offline.
 - No authentication, no database (results live in a local JSON cache and `data/runs.jsonl`).
 - The Docker setup was written but not built on my machine (Docker isn't installed there). The local setup was tested.
 - Only two-column layouts were tested. Tables, three columns and floating text boxes may still come out in the wrong order.
