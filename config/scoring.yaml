@@ -1,0 +1,50 @@
+# Scoring configuration. Everything that turns per-criterion judgements into a final
+# number lives here, so recruiters can tune it without touching code or prompts.
+# The LLM never produces the overall score; it only assigns a 0-4 level per criterion.
+
+# Each criterion's weight = importance_weight * category_weight
+importance_weights:
+  must_have: 3.0
+  important: 2.0
+  nice_to_have: 1.0
+
+category_weights:
+  skill: 1.0
+  experience: 1.0
+  education: 0.7
+  certification: 0.7
+  domain: 0.8
+  soft_skill: 0.5
+
+# Map the rubric level (0-4) the scorer assigns to points.
+level_points:
+  0: 0     # no evidence
+  1: 25    # tangential / adjacent evidence
+  2: 50    # partially meets
+  3: 75    # meets
+  4: 100   # clearly exceeds, with strong evidence
+
+grounding:
+  # If a criterion's cited resume evidence cannot be found in the resume text,
+  # drop it this many levels (0 disables the penalty).
+  ungrounded_level_penalty: 1
+  # Minimum fuzzy similarity (0-1) for a quoted snippet to count as found in the resume.
+  min_quote_similarity: 0.80
+
+knockout:
+  # If any must-have criterion scores level 0, cap the overall score.
+  enabled: true
+  cap: 45
+
+recommendation_bands:   # evaluated top-down: first band whose min <= score wins
+  - {label: "Strong fit", min: 75}
+  - {label: "Potential fit", min: 55}
+  - {label: "Weak fit", min: 35}
+  - {label: "Not a fit", min: 0}
+
+limits:
+  max_criteria: 12            # cap extracted JD criteria (keeps scoring focused & cheap)
+  resume_chunk_tokens: 3000   # token budget per resume chunk for the extraction agent
+  max_resume_chars: 60000
+  max_jd_chars: 20000
+  min_resume_chars: 200       # below this after parsing, the resume is treated as unreadable
