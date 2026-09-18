@@ -1,30 +1,36 @@
-"""Orchestrates: parse -> Agent 1 (profile) -> Agent 2a (criteria, cached per JD) -> Agent 2b (levels)
--> grounding check -> weighted aggregation. Records per-stage latency/tokens and appends each run to
-data/runs.jsonl so metrics can be analysed later."""
+"""Scoring pipeline: extracted text in, `ScoreResult` out.
+
+Stages: JD criteria extraction (cached per job description) -> resume profile extraction (cached per resume) ->
+per-criterion scoring -> quote verification against the resume and JD -> weighted aggregation. Every stage records
+latency and token usage, and each run is appended to `data/runs.jsonl` for later analysis.
+"""
+
 from __future__ import annotations
 
 import json
 import logging
 import time
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from app.agents.prompts import CRITERIA_PROMPT_VERSION, PROMPT_VERSION
 from app.agents.resume_agent import extract_profile
 from app.agents.scoring_agent import extract_criteria, score_profile
 from app.core.cache import JsonCache, text_hash
 from app.core.config import ROOT, ScoringConfig, get_scoring_config, get_settings
-from app.scoring.grounding import Grounder
-from app.llm.client import LLMClient
-from app.agents.prompts import CRITERIA_PROMPT_VERSION, PROMPT_VERSION
 from app.core.schemas import CriteriaList, ResumeProfile, RunMeta, ScoreResult, StageMetric, WeightOverrides
+from app.llm.client import LLMClient
 from app.scoring.aggregation import aggregate, build_scored, strengths_and_gaps
+from app.scoring.grounding import Grounder
 
 log = logging.getLogger(__name__)
 
 
 @contextmanager
-def _stage(stages: list[StageMetric], name: str):
+def _stage(stages: list[StageMetric], name: str) -> Iterator[StageMetric]:
+    """Time a block and append its StageMetric to `stages`."""
     m = StageMetric(name=name, latency_ms=0)
     t = time.perf_counter()
     try:
@@ -35,8 +41,15 @@ def _stage(stages: list[StageMetric], name: str):
 
 
 class ScoringPipeline:
-    def __init__(self, llm: LLMClient | None = None, cfg: ScoringConfig | None = None,
-                 cache_criteria: bool = True, cache_profiles: bool = True):
+    """Runs the full assessment; caches can be disabled to measure run-to-run variance."""
+
+    def __init__(
+        self,
+        llm: LLMClient | None = None,
+        cfg: ScoringConfig | None = None,
+        cache_criteria: bool = True,
+        cache_profiles: bool = True,
+    ) -> None:
         self.llm = llm or LLMClient()
         self.cfg = cfg or get_scoring_config()
         self.cache_criteria = cache_criteria
@@ -45,6 +58,7 @@ class ScoringPipeline:
         self.profile_cache = JsonCache("profiles")
 
     def get_criteria(self, jd_text: str, stages: list[StageMetric]) -> tuple[CriteriaList, str]:
+        """Criteria for a job description (cached), plus the cache key that identifies the JD."""
         key = text_hash(jd_text, self.llm.model, CRITERIA_PROMPT_VERSION, str(self.cfg.limits.max_criteria))
         with _stage(stages, "jd_criteria_extraction") as m:
             cached = self.criteria_cache.get(key) if self.cache_criteria else None
@@ -52,11 +66,12 @@ class ScoringPipeline:
                 m.cache_hit = True
                 return CriteriaList.model_validate(cached), key
             crit = extract_criteria(self.llm, jd_text, self.cfg.limits.max_criteria, m)
-            if self.llm.last_model == self.llm.model:   # never cache a fallback model's output under the primary key
+            if self.llm.last_model == self.llm.model:  # a fallback model's output is not cached as the primary's
                 self.criteria_cache.set(key, crit.model_dump())
             return crit, key
 
     def get_profile(self, resume_text: str, stages: list[StageMetric]) -> tuple[ResumeProfile, int]:
+        """Structured profile for a resume (cached), plus the number of chunks it was extracted from."""
         key = text_hash(resume_text, self.llm.model, PROMPT_VERSION, str(self.cfg.limits.resume_chunk_tokens))
         with _stage(stages, "resume_profile_extraction") as m:
             cached = self.profile_cache.get(key) if self.cache_profiles else None
@@ -68,9 +83,28 @@ class ScoringPipeline:
                 self.profile_cache.set(key, {"profile": profile.model_dump(), "chunks": n})
             return profile, n
 
-    def run(self, resume_text: str, jd_text: str, overrides: WeightOverrides | None = None,
-            warnings: list[str] | None = None, parse_stages: list[StageMetric] | None = None,
-            extraction: dict[str, str] | None = None) -> ScoreResult:
+    def run(
+        self,
+        resume_text: str,
+        jd_text: str,
+        overrides: WeightOverrides | None = None,
+        warnings: list[str] | None = None,
+        parse_stages: list[StageMetric] | None = None,
+        extraction: dict[str, str] | None = None,
+    ) -> ScoreResult:
+        """Assess a resume against a job description.
+
+        Args:
+            resume_text: extracted resume text.
+            jd_text: extracted job-description text.
+            overrides: optional per-request weight overrides.
+            warnings: parsing warnings to carry into the result.
+            parse_stages: metrics from document parsing, reported with the pipeline's own stages.
+            extraction: how each document's text was obtained (e.g. {"resume": "ocr-tesseract"}).
+
+        Raises:
+            LLMError: an LLM call failed.
+        """
         t0 = time.perf_counter()
         stages: list[StageMetric] = list(parse_stages or [])
         warnings = list(warnings or [])
@@ -78,9 +112,16 @@ class ScoringPipeline:
         criteria, jd_hash = self.get_criteria(jd_text, stages)
         profile, n_chunks = self.get_profile(resume_text, stages)
         with _stage(stages, "criterion_scoring") as m:
-            assessments = score_profile(self.llm, profile, criteria, m, self.cfg.scorer_input_format,
-                                        self.cfg.scorer_temperature, self.cfg.scorer_samples,
-                                        self.cfg.scoring_mode)
+            assessments = score_profile(
+                self.llm,
+                profile,
+                criteria,
+                m,
+                self.cfg.scorer_input_format,
+                self.cfg.scorer_temperature,
+                self.cfg.scorer_samples,
+                self.cfg.scoring_mode,
+            )
 
         with _stage(stages, "grounding_and_aggregation"):
             resume_g, jd_g = Grounder(resume_text), Grounder(jd_text)
@@ -95,30 +136,61 @@ class ScoringPipeline:
             strengths, gaps = strengths_and_gaps(scored)
 
         if self.llm.last_model != self.llm.model:
-            warnings.append(f"Scored with fallback model {self.llm.last_model} because {self.llm.model} was unavailable; "
-                            "scores may differ from the calibrated model.")
+            warnings.append(
+                f"Scored with fallback model {self.llm.last_model} because {self.llm.model} was unavailable; "
+                "scores may differ from the calibrated model."
+            )
         ungrounded = sum(not s.grounded for s in scored)
         if ungrounded:
             warnings.append(f"{ungrounded} criterion score(s) cited evidence not found in the resume and were reduced.")
 
-        meta = RunMeta(run_id=uuid.uuid4().hex[:12], model=self.llm.last_model, provider=self.llm.provider,
-                       total_latency_ms=round((time.perf_counter() - t0) * 1000 + sum(s.latency_ms for s in parse_stages or []), 1),
-                       stages=stages, extraction=extraction or {},
-                       resume_chars=len(resume_text), resume_chunks=n_chunks, jd_hash=jd_hash, warnings=warnings)
-        result = ScoreResult(overall_score=overall, recommendation=label, knockout_triggered=knockout,
-                             role_title=criteria.role_title, candidate_name=profile.candidate_name, criteria=scored,
-                             strengths=strengths, gaps=gaps, profile=profile, weights_used=weights, meta=meta)
+        meta = RunMeta(
+            run_id=uuid.uuid4().hex[:12],
+            model=self.llm.last_model,
+            provider=self.llm.provider,
+            total_latency_ms=round(
+                (time.perf_counter() - t0) * 1000 + sum(s.latency_ms for s in parse_stages or []), 1
+            ),
+            stages=stages,
+            extraction=extraction or {},
+            resume_chars=len(resume_text),
+            resume_chunks=n_chunks,
+            jd_hash=jd_hash,
+            warnings=warnings,
+        )
+        result = ScoreResult(
+            overall_score=overall,
+            recommendation=label,
+            knockout_triggered=knockout,
+            role_title=criteria.role_title,
+            candidate_name=profile.candidate_name,
+            criteria=scored,
+            strengths=strengths,
+            gaps=gaps,
+            profile=profile,
+            weights_used=weights,
+            meta=meta,
+        )
         self._log_run(result)
         return result
 
     @staticmethod
     def _log_run(r: ScoreResult) -> None:
+        """Append a compact record of the run to data/runs.jsonl; failures are logged, never raised."""
         path = Path(get_settings().data_dir)
         path = (path if path.is_absolute() else ROOT / path) / "runs.jsonl"
-        row = {"ts": time.time(), "run_id": r.meta.run_id, "model": r.meta.model, "candidate": r.candidate_name,
-               "jd_hash": r.meta.jd_hash, "overall": r.overall_score, "levels": {s.criterion.id: s.final_level for s in r.criteria},
-               "ungrounded": sum(not s.grounded for s in r.criteria), "latency_ms": r.meta.total_latency_ms,
-               "stages": [s.model_dump() for s in r.meta.stages]}
+        row = {
+            "ts": time.time(),
+            "run_id": r.meta.run_id,
+            "model": r.meta.model,
+            "candidate": r.candidate_name,
+            "jd_hash": r.meta.jd_hash,
+            "overall": r.overall_score,
+            "levels": {s.criterion.id: s.final_level for s in r.criteria},
+            "ungrounded": sum(not s.grounded for s in r.criteria),
+            "latency_ms": r.meta.total_latency_ms,
+            "stages": [s.model_dump() for s in r.meta.stages],
+        }
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("a", encoding="utf-8") as f:

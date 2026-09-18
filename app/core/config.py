@@ -1,47 +1,61 @@
-"""Runtime settings (env) and scoring configuration (YAML)."""
+"""Application configuration.
+
+Two sources, kept separate on purpose:
+
+* `Settings` - deployment settings from environment variables / `.env`: which LLM provider and model to call,
+  credentials, timeouts. These change per environment.
+* `ScoringConfig` - scoring behaviour from `config/scoring.yaml`: weights, rubric points, thresholds, OCR and
+  scorer settings. These are product decisions a recruiter or reviewer can tune without touching code.
+"""
+
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from dotenv import load_dotenv
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ROOT = Path(__file__).resolve().parents[2]  # repository root (app/core/config.py -> repo)
+ROOT = Path(__file__).resolve().parents[2]  # repository root
 load_dotenv(ROOT / ".env")
 
 
-def _alias(*names: str) -> AliasChoices:
-    return AliasChoices(*names)
-
-
 class Settings(BaseSettings):
-    """Env settings. The text model (both agents) and the OCR vision model each get a provider, a model and optional
-    fallback models, so either can run on Hugging Face, OpenAI, Gemini, Groq, Mistral, OpenRouter, Together, Ollama
-    or any OpenAI-compatible endpoint (app/providers.py). Old HF_* names still work as aliases."""
+    """Environment settings.
+
+    The text model (used by both agents) and the vision model (OCR fallback) each have a provider, a model and
+    optional fallback models; see `app.llm.providers` for the supported providers. Legacy `HF_*` variable names
+    are accepted as aliases.
+    """
+
     model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore", populate_by_name=True)
 
-    # text model: both agents
+    # text model (both agents)
     llm_provider: str = "huggingface"
-    llm_model: str = Field("meta-llama/Llama-3.3-70B-Instruct", validation_alias=_alias("LLM_MODEL", "HF_MODEL"))
-    llm_fallback_models: str = ""       # comma-separated, tried in order when the main model is not available
-    llm_api_key: str = ""               # optional; otherwise the provider's own variable (HF_TOKEN, OPENAI_API_KEY, ...)
-    llm_endpoint: str = ""              # only for provider "openai-compatible" (or to override a provider's URL)
-    # Hugging Face only: which inference provider serves the model ("auto" = first one enabled on the account)
-    hf_inference_provider: str = Field("auto", validation_alias=_alias("HF_INFERENCE_PROVIDER", "HF_PROVIDER"))
+    llm_model: str = Field("meta-llama/Llama-3.3-70B-Instruct", validation_alias=AliasChoices("LLM_MODEL", "HF_MODEL"))
+    llm_fallback_models: str = ""  # comma-separated, tried in order when the main model is not served
+    llm_api_key: str = ""  # overrides the provider's own key variable (HF_TOKEN, OPENAI_API_KEY, ...)
+    llm_endpoint: str = ""  # required for "openai-compatible"; optional URL override for other providers
+    hf_inference_provider: str = Field(  # Hugging Face only: which host serves the model ("auto" = first enabled)
+        "auto", validation_alias=AliasChoices("HF_INFERENCE_PROVIDER", "HF_PROVIDER")
+    )
 
-    # vision model: OCR fallback for scanned resumes
-    vlm_provider: str = ""              # empty = same as llm_provider
-    vlm_model: str = Field("meta-llama/Llama-4-Scout-17B-16E-Instruct", validation_alias=_alias("VLM_MODEL", "HF_VLM_MODEL"))
+    # vision model (OCR fallback for scanned documents)
+    vlm_provider: str = ""  # empty = same as llm_provider
+    vlm_model: str = Field(
+        "meta-llama/Llama-4-Scout-17B-16E-Instruct", validation_alias=AliasChoices("VLM_MODEL", "HF_VLM_MODEL")
+    )
     vlm_fallback_models: str = "Qwen/Qwen2.5-VL-72B-Instruct"
     vlm_api_key: str = ""
     vlm_endpoint: str = ""
-    vlm_hf_inference_provider: str = Field("auto", validation_alias=_alias("VLM_HF_INFERENCE_PROVIDER", "HF_VLM_PROVIDER"))
+    vlm_hf_inference_provider: str = Field(
+        "auto", validation_alias=AliasChoices("VLM_HF_INFERENCE_PROVIDER", "HF_VLM_PROVIDER")
+    )
 
-    tesseract_cmd: str = ""  # path to tesseract binary if it is not on PATH
+    tesseract_cmd: str = ""  # path to the tesseract binary when it is not on PATH
     llm_temperature: float = 0.0
     llm_seed: int = 42
     llm_timeout_s: float = 90
@@ -51,21 +65,29 @@ class Settings(BaseSettings):
 
 
 class Band(BaseModel):
+    """A recommendation label and the minimum overall score that earns it."""
+
     label: str
     min: float
 
 
 class Grounding(BaseModel):
+    """How strictly quoted evidence must match the resume, and the penalty when it does not."""
+
     ungrounded_level_penalty: int = Field(1, ge=0, le=4)
     min_quote_similarity: float = Field(0.8, ge=0, le=1)
 
 
 class Knockout(BaseModel):
+    """Caps the overall score when a must-have criterion has no evidence."""
+
     enabled: bool = True
     cap: float = Field(45, ge=0, le=100)
 
 
 class Limits(BaseModel):
+    """Size limits for inputs and extraction."""
+
     max_criteria: int = Field(12, ge=1, le=30)
     resume_chunk_tokens: int = Field(3000, ge=500)
     max_resume_chars: int = 60000
@@ -74,6 +96,8 @@ class Limits(BaseModel):
 
 
 class OcrConfig(BaseModel):
+    """OCR for scanned PDFs: Tesseract settings and the vision-model fallback."""
+
     enabled: bool = True
     max_pages: int = Field(4, ge=1, le=20)
     tesseract_dpi: int = Field(300, ge=72, le=600)
@@ -85,6 +109,8 @@ class OcrConfig(BaseModel):
 
 
 class ScoringConfig(BaseModel):
+    """Scoring behaviour loaded from `config/scoring.yaml`."""
+
     scorer_input_format: Literal["markdown", "json"] = "markdown"
     scorer_temperature: float = Field(0.0, ge=0, le=1.5)
     scorer_samples: int = Field(1, ge=1, le=7)
@@ -99,7 +125,7 @@ class ScoringConfig(BaseModel):
     ocr: OcrConfig = OcrConfig()
 
     @model_validator(mode="after")
-    def _check(self) -> "ScoringConfig":
+    def _check(self) -> ScoringConfig:
         if sorted(self.level_points) != [0, 1, 2, 3, 4]:
             raise ValueError("level_points must define levels 0..4")
         if any(w < 0 for w in [*self.importance_weights.values(), *self.category_weights.values()]):
@@ -110,11 +136,13 @@ class ScoringConfig(BaseModel):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Process-wide settings, read once from the environment."""
     return Settings()
 
 
 @lru_cache
 def get_scoring_config() -> ScoringConfig:
+    """Process-wide scoring configuration, read once from the YAML file."""
     path = Path(get_settings().scoring_config)
     if not path.is_absolute():
         path = ROOT / path

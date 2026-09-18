@@ -1,7 +1,7 @@
 from datetime import date
 
-from app.scoring.experience import parse_month, total_years
 from app.core.schemas import ExperienceItem
+from app.scoring.experience import parse_month, total_years
 
 TODAY = date(2026, 9, 1)
 
@@ -25,8 +25,11 @@ def test_total_years_sequential_roles():
 
 
 def test_overlap_not_double_counted_and_interns_excluded():
-    exp = [role("Jan 2020", "Dec 2021"), role("Jan 2021", "Dec 2022"),
-           role("Jun 2019", "Aug 2019", title="Software Engineering Intern")]
+    exp = [
+        role("Jan 2020", "Dec 2021"),
+        role("Jan 2021", "Dec 2022"),
+        role("Jun 2019", "Aug 2019", title="Software Engineering Intern"),
+    ]
     assert total_years(exp, today=TODAY) == 3.0
 
 

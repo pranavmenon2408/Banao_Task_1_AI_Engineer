@@ -3,8 +3,8 @@ import io
 import pytest
 from docx import Document
 
-from app.documents.parsing import DocumentError, extract_text, garble_ratio
 from app.core.schemas import ErrorCode
+from app.documents.parsing import DocumentError, extract_text, garble_ratio
 from tests.conftest import make_image_only_pdf, make_text_pdf
 
 
@@ -46,7 +46,10 @@ def test_empty_and_unsupported():
 def test_docx_not_allowed_for_resume_when_restricted():
     buf = io.BytesIO()
     Document().save(buf)
-    assert _code(lambda: extract_text("cv.docx", buf.getvalue(), allowed={"pdf", "txt"})) == ErrorCode.UNSUPPORTED_FILE_TYPE
+    assert (
+        _code(lambda: extract_text("cv.docx", buf.getvalue(), allowed={"pdf", "txt"}))
+        == ErrorCode.UNSUPPORTED_FILE_TYPE
+    )
 
 
 def test_docx_with_table():

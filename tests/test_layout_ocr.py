@@ -6,11 +6,11 @@ import pytest
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-from app.documents import pdf_layout
 from app.core.config import OcrConfig
+from app.core.schemas import ErrorCode, StageMetric
+from app.documents import pdf_layout
 from app.documents.ocr import OcrEngine, OcrFailed
 from app.documents.parsing import DocumentError, extract_text
-from app.core.schemas import ErrorCode, StageMetric
 from scripts.make_samples import scanned_image_pdf, two_column_pdf
 from tests.conftest import make_image_only_pdf
 
@@ -24,19 +24,24 @@ def _doc(data: bytes) -> pymupdf.Document:
 
 # ---------------------------------------------------------------- multi-column
 
+
 def test_two_column_is_read_column_by_column():
     left = ["SKILLS", "Python", "Kafka", "Docker", "Redis", "AWS", "EDUCATION", "B.E. Computer Science"]
-    right = ["EXPERIENCE", "Senior Engineer, Razorfin (2022 - Present)",
-             "- Introduced Kafka-based event pipeline for transaction status updates, cutting lag",
-             "- Optimised PostgreSQL queries and partitioned the ledger table, reducing latency",
-             "- Mentored three junior engineers and led design reviews", "Engineer, LendQuick (2019 - 2022)",
-             "- Built loan-disbursal microservices with Django"]
+    right = [
+        "EXPERIENCE",
+        "Senior Engineer, Razorfin (2022 - Present)",
+        "- Introduced Kafka-based event pipeline for transaction status updates, cutting lag",
+        "- Optimised PostgreSQL queries and partitioned the ledger table, reducing latency",
+        "- Mentored three junior engineers and led design reviews",
+        "Engineer, LendQuick (2019 - 2022)",
+        "- Built loan-disbursal microservices with Django",
+    ]
     text, multi = pdf_layout.extract(_doc(two_column_pdf(left, right)))
     assert multi
     lines = text.splitlines()
     # the whole sidebar comes before the main column, and no sidebar word lands inside a bullet
     assert lines.index("B.E. Computer Science") < lines.index("EXPERIENCE")
-    joined = " ".join(lines[lines.index("EXPERIENCE"):])
+    joined = " ".join(lines[lines.index("EXPERIENCE") :])
     assert "cutting lag" in joined and "Redis" not in joined
 
 
@@ -54,10 +59,11 @@ def test_right_aligned_dates_are_not_a_second_column():
     c.save()
     text, multi = pdf_layout.extract(_doc(buf.getvalue()))
     assert not multi
-    assert "Senior Engineer 3, Company 3  2013 - 2014" in text   # date stays on its role's line
+    assert "Senior Engineer 3, Company 3  2013 - 2014" in text  # date stays on its role's line
 
 
 # ---------------------------------------------------------------- OCR chain (fakes, no network)
+
 
 class FakeVLM:
     last_model = "fake/vision-model"
@@ -67,6 +73,7 @@ class FakeVLM:
 
     def complete_text(self, messages, metric, max_tokens=2000):
         from app.llm.client import LLMError
+
         self.calls += 1
         metric.llm_calls += 1
         metric.prompt_tokens += 2500
@@ -78,7 +85,7 @@ class FakeVLM:
 def engine(tesseract_result=None, vlm=None, **cfg) -> OcrEngine:
     e = OcrEngine(OcrConfig(**cfg), vlm=vlm)
     if tesseract_result is None:
-        e.__dict__["tesseract"] = None           # simulate "binary not installed"
+        e.__dict__["tesseract"] = None  # simulate "binary not installed"
     else:
         e.__dict__["tesseract"] = object()
         e._tesseract_page = lambda page: tesseract_result
@@ -90,7 +97,9 @@ GOOD_TEXT = "Senior Engineer at Razorfin Payments. Built Kafka pipelines and Pos
 
 def test_tesseract_confident_result_is_used_without_vlm():
     vlm = FakeVLM(GOOD_TEXT)
-    out = engine((GOOD_TEXT, 92.0 * len(GOOD_TEXT), len(GOOD_TEXT)), vlm).run(_doc(make_image_only_pdf()), StageMetric(name="t", latency_ms=0))
+    out = engine((GOOD_TEXT, 92.0 * len(GOOD_TEXT), len(GOOD_TEXT)), vlm).run(
+        _doc(make_image_only_pdf()), StageMetric(name="t", latency_ms=0)
+    )
     assert out.method == "tesseract" and out.confidence == 92.0 and vlm.calls == 0
 
 
@@ -128,6 +137,7 @@ def test_extract_text_reports_ocr_method_and_warning():
 
 
 # ---------------------------------------------------------------- real Tesseract (skipped if not installed)
+
 
 def test_real_tesseract_reads_scanned_resume():
     e = OcrEngine(OcrConfig(vlm_fallback=False))

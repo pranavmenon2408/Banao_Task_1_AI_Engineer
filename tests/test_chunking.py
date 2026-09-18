@@ -4,7 +4,9 @@ from app.documents.chunking import chunk_resume, estimate_tokens, split_sections
 def _long_resume(jobs: int = 30) -> str:
     parts = ["John Smith\nSUMMARY\nEngineer with broad experience.", "EXPERIENCE"]
     for i in range(jobs):
-        bullets = "\n".join(f"- Delivered project {i}.{b} improving throughput and reliability for users" for b in range(8))
+        bullets = "\n".join(
+            f"- Delivered project {i}.{b} improving throughput and reliability for users" for b in range(8)
+        )
         parts.append(f"Engineer {i}, Company {i} (2000 - 2001)\n{bullets}\n")
     parts += ["EDUCATION\nB.Sc Physics, Some University, 1999", "SKILLS\nPython, Go, SQL"]
     return "\n".join(parts)

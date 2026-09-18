@@ -1,0 +1,45 @@
+[project]
+name = "resume-jd-fit-scorer"
+version = "1.0.0"
+description = "Two-agent resume vs job-description fit assessment with evidence-grounded, per-criterion scores."
+requires-python = ">=3.13"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = [".venv", "data", "reports"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # import order
+    "UP",       # pyupgrade
+    "B",        # bugbear
+    "SIM",      # simplifications
+    "ANN",      # type annotations on every function
+    "D1",       # docstrings on public modules, classes and functions
+]
+ignore = [
+    "ANN401",   # Any is sometimes the honest type (provider payloads)
+    "D105",     # magic methods
+    "D107",     # __init__ (documented on the class)
+    "SIM108",   # ternaries are not always clearer
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN", "D1"]
+"scripts/**" = ["D103"]
+"ui/**" = ["E501"]  # inline CSS/HTML templates
+"**/__init__.py" = ["D104"]
+"app/agents/prompts.py" = ["E501"]  # prompt text: re-wrapping would change what the model sees
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "scripts", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: calls a real LLM provider (needs HF_TOKEN); skipped otherwise"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.File", "fastapi.Form", "fastapi.Depends"]

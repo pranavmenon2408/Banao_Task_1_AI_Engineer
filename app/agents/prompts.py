@@ -1,7 +1,11 @@
-"""All prompts in one place. Bump PROMPT_VERSION when any prompt changes: it is part of the cache
-key, so cached criteria/profiles from an older prompt are never reused."""
+"""Prompts for the extraction agent, the scoring agent and the OCR vision model.
 
-PROMPT_VERSION = "v8"       # resume extraction + scoring prompts
+`PROMPT_VERSION` and `CRITERIA_PROMPT_VERSION` are part of the cache keys: bump the relevant one whenever a prompt
+changes so results produced by an older prompt are never reused. Criteria have their own version so that scorer
+changes do not invalidate the criteria already extracted for a job description.
+"""
+
+PROMPT_VERSION = "v8"  # resume extraction + scoring prompts
 CRITERIA_PROMPT_VERSION = "c1"  # JD criteria prompt (separate so scorer changes keep cached criteria)
 
 # ---------------------------------------------------------------------------------------------
@@ -16,7 +20,7 @@ VLM_TRANSCRIBE_PROMPT = """Transcribe ALL text on this document page exactly as 
 - If the page has no readable text, output exactly: NO_TEXT"""
 
 # ---------------------------------------------------------------------------------------------
-# Agent 1: resume -> structured profile
+# Extraction agent: resume -> structured profile
 # ---------------------------------------------------------------------------------------------
 
 RESUME_EXTRACTOR_SYSTEM = """You are a precise resume-extraction engine. You convert raw resume text into structured JSON.
@@ -54,12 +58,14 @@ RESUME_EXTRACTOR_USER = """{chunk_note}Resume text:
 {text}
 RESUME>>>"""
 
-CHUNK_NOTE = ("This is part {i} of {n} of a long resume, split at section boundaries. Extract only what appears in "
-              "this part; other parts are processed separately and merged. Leave fields empty if they are not in "
-              "this part.\n\n")
+CHUNK_NOTE = (
+    "This is part {i} of {n} of a long resume, split at section boundaries. Extract only what appears in "
+    "this part; other parts are processed separately and merged. Leave fields empty if they are not in "
+    "this part.\n\n"
+)
 
 # ---------------------------------------------------------------------------------------------
-# Agent 2, step A: job description -> criteria
+# Scoring agent, step 1: job description -> criteria
 # ---------------------------------------------------------------------------------------------
 
 CRITERIA_EXTRACTOR_SYSTEM = """You are an expert technical recruiter. Turn a job description into a list of distinct,
@@ -93,7 +99,7 @@ CRITERIA_EXTRACTOR_USER = """Job description:
 JD>>>"""
 
 # ---------------------------------------------------------------------------------------------
-# Agent 2, step B: profile x criteria -> per-criterion levels
+# Scoring agent, step 2: profile x criteria -> per-criterion levels
 # ---------------------------------------------------------------------------------------------
 
 SCORER_SYSTEM = """You are a rigorous, consistent hiring assessor. You rate a candidate profile against each hiring
@@ -186,12 +192,17 @@ SECTION_FOCUS = {
 }
 
 # criterion category -> section, and which resume parts each section's scorer sees
-CATEGORY_SECTION = {"experience": "experience", "skill": "skills", "certification": "skills",
-                    "education": "education", "domain": "domain", "soft_skill": "domain"}
-# Every section except education also sees the skills list and projects: the criteria extractor's category
-# is a model judgement, and a criterion filed under the wrong section must still see its evidence. (Observed:
-# Llama-3.3 filed "Observability tooling" under experience; that scorer couldn't see "Prometheus, Grafana" in
-# the skills list and scored 0. See docs/DEVLOG.md.) The section's *rules* are what stay focused.
+CATEGORY_SECTION = {
+    "experience": "experience",
+    "skill": "skills",
+    "certification": "skills",
+    "education": "education",
+    "domain": "domain",
+    "soft_skill": "domain",
+}
+# Every section except education also sees the skills list and projects. A criterion's category is a model
+# judgement, so a criterion filed under an unexpected section must still be able to see its evidence; what stays
+# section-specific is the scoring rules.
 SECTION_PARTS = {
     "experience": frozenset({"header", "experience", "projects", "skills"}),
     "skills": frozenset({"experience", "projects", "skills", "certifications"}),

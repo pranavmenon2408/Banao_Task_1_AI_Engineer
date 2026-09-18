@@ -1,8 +1,13 @@
-"""Pydantic models shared by the agents, the API and the UI."""
+"""Pydantic models shared by the agents, the pipeline, the API and the UI.
+
+Grouped by stage: the resume profile produced by the extraction agent, the criteria and assessments produced by
+the scoring agent, and the final result returned by the API.
+"""
+
 from __future__ import annotations
 
-from enum import Enum
-from typing import Literal
+from enum import StrEnum
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -10,7 +15,9 @@ Category = Literal["skill", "experience", "education", "certification", "domain"
 Importance = Literal["must_have", "important", "nice_to_have"]
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
+    """Machine-readable error codes returned by the API."""
+
     UNSUPPORTED_FILE_TYPE = "UNSUPPORTED_FILE_TYPE"
     EMPTY_FILE = "EMPTY_FILE"
     FILE_TOO_LARGE = "FILE_TOO_LARGE"
@@ -28,15 +35,20 @@ class ErrorCode(str, Enum):
 
 
 class ApiError(BaseModel):
+    """Error body returned by every failing endpoint."""
+
     code: ErrorCode
     message: str
     hint: str | None = None
     field: str | None = None
 
 
-# ---------- Agent 1: resume profile ----------
+# ---------- resume profile (extraction agent) ----------
+
 
 class ExperienceItem(BaseModel):
+    """One role, with its bullets copied verbatim from the resume."""
+
     title: str = ""
     company: str = ""
     start: str | None = None
@@ -46,6 +58,8 @@ class ExperienceItem(BaseModel):
 
 
 class EducationItem(BaseModel):
+    """One degree or qualification."""
+
     degree: str = ""
     field: str | None = None
     institution: str = ""
@@ -53,12 +67,16 @@ class EducationItem(BaseModel):
 
 
 class ProjectItem(BaseModel):
+    """A project listed on the resume."""
+
     name: str = ""
     description: str = ""
     technologies: list[str] = Field(default_factory=list)
 
 
 class ResumeProfile(BaseModel):
+    """Structured view of a resume. `summary` is generated; every other field is extracted from the text."""
+
     candidate_name: str | None = None
     headline: str | None = None
     summary: str = ""
@@ -71,9 +89,12 @@ class ResumeProfile(BaseModel):
     other: list[str] = Field(default_factory=list)
 
 
-# ---------- Agent 2: criteria + assessments ----------
+# ---------- criteria and assessments (scoring agent) ----------
+
 
 class Criterion(BaseModel):
+    """A single assessable requirement taken from the job description."""
+
     id: str
     name: str
     description: str
@@ -83,12 +104,16 @@ class Criterion(BaseModel):
 
 
 class CriteriaList(BaseModel):
+    """All criteria extracted from one job description."""
+
     role_title: str | None = None
     seniority: str | None = None
     criteria: list[Criterion]
 
 
 class CriterionAssessment(BaseModel):
+    """The scorer's judgement for one criterion: a rubric level, its reasoning and quoted evidence."""
+
     criterion_id: str
     level: int = Field(ge=0, le=4)
     reasoning: str
@@ -98,23 +123,30 @@ class CriterionAssessment(BaseModel):
 
     @field_validator("level", mode="before")
     @classmethod
-    def _coerce_level(cls, v):
+    def _coerce_level(cls, v: Any) -> int:
         return int(round(float(v)))
 
 
 class AssessmentList(BaseModel):
+    """Scorer output: one assessment per criterion."""
+
     assessments: list[CriterionAssessment]
 
 
-# ---------- Final result ----------
+# ---------- final result ----------
+
 
 class EvidenceCheck(BaseModel):
+    """Whether a quoted piece of evidence was found in the source document."""
+
     quote: str
     found: bool
     similarity: float
 
 
 class ScoredCriterion(BaseModel):
+    """A criterion with its verified level, points and weighted contribution to the overall score."""
+
     criterion: Criterion
     raw_level: int
     final_level: int
@@ -131,6 +163,8 @@ class ScoredCriterion(BaseModel):
 
 
 class StageMetric(BaseModel):
+    """Latency, LLM usage and cache status of one pipeline stage."""
+
     name: str
     latency_ms: float
     llm_calls: int = 0
@@ -142,6 +176,8 @@ class StageMetric(BaseModel):
 
 
 class RunMeta(BaseModel):
+    """Operational metadata for one scoring run."""
+
     run_id: str
     model: str
     provider: str
@@ -155,6 +191,8 @@ class RunMeta(BaseModel):
 
 
 class ScoreResult(BaseModel):
+    """Full fit assessment returned by `POST /api/v1/score`."""
+
     overall_score: float = Field(ge=0, le=100)
     recommendation: str
     knockout_triggered: bool
@@ -164,32 +202,36 @@ class ScoreResult(BaseModel):
     strengths: list[str]
     gaps: list[str]
     profile: ResumeProfile
-    weights_used: dict
+    weights_used: dict[str, Any]
     meta: RunMeta
 
 
 class WeightOverrides(BaseModel):
-    """Optional per-request override of config weights (validated, never free-form)."""
+    """Optional per-request override of the configured weights."""
+
     importance_weights: dict[Importance, float] | None = None
     category_weights: dict[Category, float] | None = None
 
     @field_validator("importance_weights", "category_weights")
     @classmethod
-    def _bounded(cls, v):
+    def _bounded(cls, v: dict[str, float] | None) -> dict[str, float] | None:
         if v and any(w < 0 or w > 10 for w in v.values()):
             raise ValueError("weights must be between 0 and 10")
         return v
 
 
 class RescoreRequest(BaseModel):
-    """Recompute the aggregate from existing per-criterion results with new weights (no LLM call)."""
+    """Existing per-criterion results plus new weights; re-aggregated without calling the LLM."""
+
     criteria: list[ScoredCriterion]
     overrides: WeightOverrides
 
 
 class RescoreResult(BaseModel):
+    """Result of `POST /api/v1/rescore`."""
+
     overall_score: float
     recommendation: str
     knockout_triggered: bool
     criteria: list[ScoredCriterion]
-    weights_used: dict
+    weights_used: dict[str, Any]

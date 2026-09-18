@@ -9,6 +9,7 @@ Outputs in samples/:
   unreadable_encrypted_resume.pdf  password-protected PDF
   unreadable_corrupt_resume.pdf    truncated PDF bytes
 """
+
 from __future__ import annotations
 
 import io
@@ -117,8 +118,12 @@ def main() -> None:
     txt = "\n".join(a)
     body, rest = txt.split("EDUCATION", 1)
     edu, skills = rest.split("SKILLS", 1)
-    left = ["CONTACT", "Bengaluru, India", "ananya.rao@example.com", "+91 98450 00000", "",
-            "SKILLS"] + [s.strip() for s in skills.strip().split(",")] + ["", "EDUCATION"] + edu.strip().splitlines()
+    left = (
+        ["CONTACT", "Bengaluru, India", "ananya.rao@example.com", "+91 98450 00000", "", "SKILLS"]
+        + [s.strip() for s in skills.strip().split(",")]
+        + ["", "EDUCATION"]
+        + edu.strip().splitlines()
+    )
     right = [ln for ln in body.splitlines()[3:]]
     (S / "resume_a_two_column.pdf").write_bytes(two_column_pdf(left, right))
     (S / "unreadable_scanned_resume.pdf").write_bytes(scanned_pdf(a))

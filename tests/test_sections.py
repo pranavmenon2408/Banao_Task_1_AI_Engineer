@@ -1,11 +1,20 @@
 from app.agents.scoring_agent import _jobs, _vote
-from app.core.schemas import (Criterion, CriterionAssessment, EducationItem, ExperienceItem, ResumeProfile)
+from app.core.schemas import Criterion, CriterionAssessment, EducationItem, ExperienceItem, ResumeProfile
 
 PROFILE = ResumeProfile(
-    candidate_name="A", skills=["Kafka", "Python"],
-    experience=[ExperienceItem(title="Engineer", company="Pay", start="Jan 2020", end="Dec 2022",
-                               highlights=["Built Kafka consumers in Python"])],
-    education=[EducationItem(degree="B.Tech", field="Computer Science", institution="IIT")])
+    candidate_name="A",
+    skills=["Kafka", "Python"],
+    experience=[
+        ExperienceItem(
+            title="Engineer",
+            company="Pay",
+            start="Jan 2020",
+            end="Dec 2022",
+            highlights=["Built Kafka consumers in Python"],
+        )
+    ],
+    education=[EducationItem(degree="B.Tech", field="Computer Science", institution="IIT")],
+)
 
 
 def crit(cid, category):
@@ -21,9 +30,17 @@ def test_single_mode_is_one_call_with_everything():
 
 
 def test_sectioned_routes_criteria_to_matching_resume_sections():
-    cs = [crit("c1", "experience"), crit("c2", "skill"), crit("c3", "certification"), crit("c4", "education"),
-          crit("c5", "domain")]
-    jobs = {tuple(c.id for c in crits): (system, text) for system, text, crits in _jobs(PROFILE, cs, "sectioned", "markdown")}
+    cs = [
+        crit("c1", "experience"),
+        crit("c2", "skill"),
+        crit("c3", "certification"),
+        crit("c4", "education"),
+        crit("c5", "domain"),
+    ]
+    jobs = {
+        tuple(c.id for c in crits): (system, text)
+        for system, text, crits in _jobs(PROFILE, cs, "sectioned", "markdown")
+    }
     assert set(jobs) == {("c1",), ("c2", "c3"), ("c4",), ("c5",)}
     exp_sys, exp_text = jobs[("c1",)]
     assert "SECTION FOCUS" in exp_sys and "EXPERIENCE criteria" in exp_sys and "computed in code" in exp_text
@@ -36,6 +53,8 @@ def test_sectioned_routes_criteria_to_matching_resume_sections():
 
 
 def test_median_vote_and_agreement():
-    a = lambda lvl: {"c1": CriterionAssessment(criterion_id="c1", level=lvl, reasoning=f"r{lvl}")}
+    def a(lvl):
+        return {"c1": CriterionAssessment(criterion_id="c1", level=lvl, reasoning=f"r{lvl}")}
+
     out = _vote([a(3), a(4), a(3)], ["c1"])
     assert out["c1"].level == 3 and out["c1"].agreement == 0.67 and out["c1"].reasoning == "r3"

@@ -8,21 +8,57 @@ attribute achievements to the wrong role. Sections are packed greedily into chun
 budget; only a single section that is larger than the budget gets split, on paragraph/line
 boundaries, with its heading repeated so the chunk keeps its context.
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 
 HEADINGS = {
-    "summary", "professional summary", "profile", "objective", "about", "about me",
-    "experience", "work experience", "professional experience", "employment", "employment history",
-    "work history", "career history", "relevant experience",
-    "education", "academic background", "qualifications",
-    "skills", "technical skills", "core skills", "key skills", "core competencies", "technologies",
-    "projects", "personal projects", "key projects", "selected projects",
-    "certifications", "certificates", "licenses", "courses", "training",
-    "publications", "awards", "achievements", "honors", "languages", "interests", "volunteering",
-    "volunteer experience", "leadership", "activities", "references", "research",
+    "summary",
+    "professional summary",
+    "profile",
+    "objective",
+    "about",
+    "about me",
+    "experience",
+    "work experience",
+    "professional experience",
+    "employment",
+    "employment history",
+    "work history",
+    "career history",
+    "relevant experience",
+    "education",
+    "academic background",
+    "qualifications",
+    "skills",
+    "technical skills",
+    "core skills",
+    "key skills",
+    "core competencies",
+    "technologies",
+    "projects",
+    "personal projects",
+    "key projects",
+    "selected projects",
+    "certifications",
+    "certificates",
+    "licenses",
+    "courses",
+    "training",
+    "publications",
+    "awards",
+    "achievements",
+    "honors",
+    "languages",
+    "interests",
+    "volunteering",
+    "volunteer experience",
+    "leadership",
+    "activities",
+    "references",
+    "research",
 }
 
 
@@ -43,15 +79,19 @@ def _is_heading(line: str) -> bool:
 
 @dataclass
 class Section:
+    """A resume section: its heading line (may be empty) and body text."""
+
     heading: str
     body: str
 
     @property
     def text(self) -> str:
+        """Heading and body as one block of text."""
         return f"{self.heading}\n{self.body}".strip() if self.heading else self.body.strip()
 
 
 def split_sections(text: str) -> list[Section]:
+    """Split resume text into sections at recognised headings."""
     sections: list[Section] = []
     heading, buf = "", []
     for line in text.splitlines():
@@ -75,7 +115,7 @@ def _split_oversized(section: Section, budget: int) -> list[str]:
     max_chars = budget * 4
     pieces: list[str] = []
     for u in units:  # hard-cut pathological single lines that alone exceed the budget
-        pieces.extend(u[i:i + max_chars] for i in range(0, len(u), max_chars))
+        pieces.extend(u[i : i + max_chars] for i in range(0, len(u), max_chars))
 
     out: list[str] = []
     cur: list[str] = []
@@ -91,6 +131,7 @@ def _split_oversized(section: Section, budget: int) -> list[str]:
 
 
 def chunk_resume(text: str, budget_tokens: int = 3000) -> list[str]:
+    """Return the resume as one chunk if it fits the budget, otherwise as section-aligned chunks."""
     if estimate_tokens(text) <= budget_tokens:
         return [text]
     chunks: list[str] = []

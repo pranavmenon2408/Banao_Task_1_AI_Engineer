@@ -1,9 +1,10 @@
-"""Deterministic years-of-experience from extracted role dates.
+"""Years of experience computed from extracted role dates.
 
-Asking the LLM "does 3.2 years meet 5+?" is arithmetic we can do exactly. We parse each role's
-start/end ("Mar 2022", "2019", "Present", "06/2020"), merge overlapping periods so concurrent roles
-aren't double counted, and hand the scorer the computed number.
+Whether "3.2 years" meets "5+ years" is arithmetic, so it is computed here rather than judged by the model. Each
+role's start and end ("Mar 2022", "2019", "06/2020", "Present") is parsed, overlapping periods are merged so
+concurrent roles are not double counted, and internships are excluded by default.
 """
+
 from __future__ import annotations
 
 import re
@@ -11,7 +12,9 @@ from datetime import date
 
 from app.core.schemas import ExperienceItem
 
-MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+MONTHS = {
+    m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)
+}
 PRESENT = {"present", "current", "now", "today", "ongoing", "till date", "date"}
 INTERN = re.compile(r"\bintern(ship)?\b|\btrainee\b", re.I)
 
@@ -38,6 +41,7 @@ def parse_month(s: str | None, *, end: bool = False, today: date | None = None) 
 
 
 def role_months(e: ExperienceItem, today: date | None = None) -> tuple[int, int] | None:
+    """A role's (start, end) in months, end exclusive; None if the dates cannot be parsed."""
     s, en = parse_month(e.start, today=today), parse_month(e.end, end=True, today=today)
     if s is None:
         return None
@@ -48,7 +52,10 @@ def role_months(e: ExperienceItem, today: date | None = None) -> tuple[int, int]
     return (s, en + 1) if en >= s else None
 
 
-def total_years(experience: list[ExperienceItem], include_internships: bool = False, today: date | None = None) -> float | None:
+def total_years(
+    experience: list[ExperienceItem], include_internships: bool = False, today: date | None = None
+) -> float | None:
+    """Total professional years across roles, with overlaps merged; None if no dates parse."""
     spans = []
     for e in experience:
         if not include_internships and INTERN.search(e.title or ""):

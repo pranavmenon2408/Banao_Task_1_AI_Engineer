@@ -1,10 +1,10 @@
 """Verify that quoted evidence actually appears in the source document.
 
-The scorer is told to quote the resume verbatim. This module checks that it did, so a hallucinated
-"Led a team of 12 engineers" can't raise a score. Exact normalised substring match first; if that
-fails, a fuzzy match against same-length word windows, which tolerates the small differences
-PDF extraction introduces (hyphenation, bullets, ligatures).
+The scorer must quote the resume verbatim; this module checks that it did, so an invented quote cannot raise a
+score. A quote is compared as an exact normalised substring first, then fuzzily against same-length word windows,
+which tolerates the small differences PDF extraction introduces (hyphenation, bullets, ligatures).
 """
+
 from __future__ import annotations
 
 import re
@@ -21,24 +21,27 @@ def _norm(s: str) -> str:
 
 
 class Grounder:
-    def __init__(self, source_text: str):
+    """Checks quotes against one source document."""
+
+    def __init__(self, source_text: str) -> None:
         self.norm = _norm(source_text)
         self.words = self.norm.split()
 
     def similarity(self, quote: str) -> float:
+        """Best similarity (0-1) between the quote and any matching span of the source."""
         best = self._similarity(quote)
         if best >= 0.97:
             return best
-        # The scorer often quotes a line the renderer assembled from several extracted fields
-        # ("B.E. Computer Science, RV College of Engineering, 2018"; "Python, FastAPI, Kafka"). Such a
-        # line is grounded if every fragment is. Observed: a correct education level was cut because
-        # the joined line did not exist verbatim (docs/DEVLOG.md).
+        # The scorer often quotes a line assembled from several extracted fields, e.g.
+        # "B.E. Computer Science, RV College of Engineering, 2018" or "Python, FastAPI, Kafka". Such a line
+        # does not exist verbatim in the resume but is grounded if every fragment is.
         frags = [f.strip() for f in re.split(r"\s*[,|;]\s*", quote) if len(f.strip()) >= 2]
         if len(frags) > 1:
             best = max(best, min(self._similarity(f) for f in frags))
         return best
 
     def _similarity(self, quote: str) -> float:
+        """Similarity of the whole quote: exact normalised match, else best fuzzy window match."""
         q = _norm(quote.strip(" .\"'…").replace("...", " "))
         if not q:
             return 0.0
@@ -52,9 +55,9 @@ class Grounder:
         first = set(qw[:3])
         for i in range(0, max(1, len(self.words) - n + 1)):
             # cheap pre-filter: a real match shares at least one of the first three words nearby
-            if not first.intersection(self.words[i:i + 3]):
+            if not first.intersection(self.words[i : i + 3]):
                 continue
-            window = " ".join(self.words[i:i + n])
+            window = " ".join(self.words[i : i + n])
             sm = SequenceMatcher(None, q, window, autojunk=False)
             if sm.quick_ratio() <= best:
                 continue
@@ -64,6 +67,7 @@ class Grounder:
         return round(best, 3)
 
     def check(self, quotes: list[str], threshold: float) -> list[EvidenceCheck]:
+        """Check each quote against the source at the given similarity threshold."""
         out = []
         for q in quotes:
             sim = self.similarity(q)

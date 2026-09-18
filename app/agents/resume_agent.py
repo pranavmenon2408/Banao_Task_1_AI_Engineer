@@ -1,21 +1,22 @@
-"""Agent 1: raw resume text -> structured ResumeProfile.
+"""Extraction agent: raw resume text -> structured `ResumeProfile`.
 
-Short resumes (the common case) are one call. Long ones are chunked at section boundaries, each
-chunk is extracted independently (map), and the partial profiles are merged in code (reduce).
-Merging in code rather than with another LLM call keeps it deterministic and avoids a model
-"summarising away" verbatim highlights that the grounding check depends on.
+A typical resume is extracted in a single call. Long resumes are split at section boundaries, each chunk is
+extracted independently, and the partial profiles are merged in code. Merging deterministically, rather than with
+another LLM call, keeps the verbatim bullet text that quote verification depends on.
 """
+
 from __future__ import annotations
 
 from datetime import date
 
-from app.documents.chunking import chunk_resume
-from app.llm.client import LLMClient
 from app.agents.prompts import CHUNK_NOTE, RESUME_EXTRACTOR_SYSTEM, RESUME_EXTRACTOR_USER
 from app.core.schemas import ResumeProfile, StageMetric
+from app.documents.chunking import chunk_resume
+from app.llm.client import LLMClient
 
 
 def _dedupe(items: list[str]) -> list[str]:
+    """Remove case/whitespace-insensitive duplicates, keeping first occurrences."""
     seen, out = set(), []
     for s in items:
         k = " ".join(s.lower().split())
@@ -26,6 +27,7 @@ def _dedupe(items: list[str]) -> list[str]:
 
 
 def merge_profiles(parts: list[ResumeProfile]) -> ResumeProfile:
+    """Merge per-chunk profiles; a role that spans two chunks is joined rather than duplicated."""
     if len(parts) == 1:
         return parts[0]
     merged = ResumeProfile()
@@ -43,8 +45,14 @@ def merge_profiles(parts: list[ResumeProfile]) -> ResumeProfile:
         merged.other += p.other
         for exp in p.experience:
             # A role split across chunks shows up twice: join its highlights instead of duplicating it.
-            same = next((e for e in merged.experience
-                         if e.title.lower() == exp.title.lower() and e.company.lower() == exp.company.lower()), None)
+            same = next(
+                (
+                    e
+                    for e in merged.experience
+                    if e.title.lower() == exp.title.lower() and e.company.lower() == exp.company.lower()
+                ),
+                None,
+            )
             if same:
                 same.highlights = _dedupe(same.highlights + exp.highlights)
                 same.start, same.end = same.start or exp.start, same.end or exp.end
@@ -57,12 +65,22 @@ def merge_profiles(parts: list[ResumeProfile]) -> ResumeProfile:
     return merged
 
 
-def extract_profile(llm: LLMClient, resume_text: str, chunk_tokens: int, metric: StageMetric) -> tuple[ResumeProfile, int]:
+def extract_profile(
+    llm: LLMClient, resume_text: str, chunk_tokens: int, metric: StageMetric
+) -> tuple[ResumeProfile, int]:
+    """Extract a profile from resume text; returns (profile, number of chunks used)."""
     chunks = chunk_resume(resume_text, chunk_tokens)
     system = RESUME_EXTRACTOR_SYSTEM.format(today=date.today().strftime("%b %Y"))
     parts = []
     for i, chunk in enumerate(chunks, 1):
         note = CHUNK_NOTE.format(i=i, n=len(chunks)) if len(chunks) > 1 else ""
-        parts.append(llm.complete_json(system, RESUME_EXTRACTOR_USER.format(chunk_note=note, text=chunk),
-                                       ResumeProfile, metric, max_tokens=3500))
+        parts.append(
+            llm.complete_json(
+                system,
+                RESUME_EXTRACTOR_USER.format(chunk_note=note, text=chunk),
+                ResumeProfile,
+                metric,
+                max_tokens=3500,
+            )
+        )
     return merge_profiles(parts), len(chunks)
