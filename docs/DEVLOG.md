@@ -100,7 +100,7 @@ All with the new rubric and points. Reports are in `reports/`. Variants 3-5 ran 
 - T=0.5 with one sample is the noisiest (A dropped to 80.7 once), as expected.
 - Median-of-3 at T=0.5 gets back to T=0's stability but costs 2.2x the tokens, so it's not worth it here.
 - JSON input: similar means but noisier (B range 9.0) and ~6% more tokens than markdown.
-- Sectioned: the most stable, and faster because 4 small calls run in parallel. Tokens roughly double because the rubric
+- Sectioned: the most stable (**wrong, confounded; see the fair re-test in entry 6**), and faster because 4 small calls run in parallel. Tokens roughly double because the rubric
   system prompt is repeated per section. At the provider's cost estimate for this model (~$0.37 / 1M tokens) that is
   about $0.003 per resume.
 - Chosen default: **sectioned, markdown, T=0, 1 sample**. The latency outlier in run 3 (116-136 s) was provider-side

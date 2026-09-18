@@ -15,7 +15,8 @@ scorer_samples: 1
 # single    = all criteria in one call against the whole profile
 # sectioned = criteria grouped by JD section (experience / skills / education / domain), each scored in a
 #             parallel call against only the resume sections that can evidence it, with section-specific rules.
-# Sectioned was the most stable in calibration (worst range 3.1 vs 3.8) and faster (~40 s vs ~46 s) at ~2x tokens.
+# In a fair A/B (docs/DEVLOG.md entry 6) sectioned was NOT more stable than single, but ~30% faster (22 s vs 31 s)
+# and applied section rules more reliably, at ~2.2x tokens (~$0.002 per resume).
 scoring_mode: sectioned
 
 # Each criterion's weight = importance_weight * category_weight
