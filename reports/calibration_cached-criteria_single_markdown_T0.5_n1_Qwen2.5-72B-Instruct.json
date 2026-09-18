@@ -1,0 +1,349 @@
+{
+ "model": "Qwen/Qwen2.5-72B-Instruct",
+ "provider": "auto",
+ "repeats": 3,
+ "input_format": "markdown",
+ "scorer_temperature": 0.5,
+ "scorer_samples": 1,
+ "scoring_mode": "single",
+ "fresh_criteria": false,
+ "summary": {
+  "A (strong)": {
+   "mean": 89.3,
+   "min": 80.7,
+   "max": 93.9,
+   "range": 13.2,
+   "stdev": 6.1,
+   "mean_latency_s": 83.6,
+   "mean_tokens": 3811,
+   "ungrounded_total": 2
+  },
+  "B (strong, similar to A)": {
+   "mean": 86.3,
+   "min": 85.0,
+   "max": 87.3,
+   "range": 2.3,
+   "stdev": 1.0,
+   "mean_latency_s": 89.4,
+   "mean_tokens": 3564,
+   "ungrounded_total": 3
+  },
+  "C (adjacent / weaker)": {
+   "mean": 25.9,
+   "min": 24.4,
+   "max": 29.0,
+   "range": 4.6,
+   "stdev": 2.2,
+   "mean_latency_s": 54.4,
+   "mean_tokens": 3181,
+   "ungrounded_total": 0
+  }
+ },
+ "gap_A_B": 3.0,
+ "wall_time_s": 682.4,
+ "runs": {
+  "A (strong)": [
+   {
+    "overall": 93.3,
+    "recommendation": "Strong fit",
+    "levels": {
+     "Backend Experience": 4,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 4,
+     "Cloud Deployment": 4,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 3
+    },
+    "raw_levels": {
+     "Backend Experience": 4,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 4,
+     "Cloud Deployment": 4,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 3
+    },
+    "ungrounded": 0,
+    "mean_agreement": 1.0,
+    "n_criteria": 9,
+    "latency_s": 68.4525,
+    "tokens": 3812,
+    "llm_calls": 2,
+    "retries": 0
+   },
+   {
+    "overall": 80.7,
+    "recommendation": "Strong fit",
+    "levels": {
+     "Backend Experience": 3,
+     "Python Proficiency": 3,
+     "Database Experience": 3,
+     "Message Queues": 3,
+     "Cloud Deployment": 3,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 0,
+     "Observability Tools": 3
+    },
+    "raw_levels": {
+     "Backend Experience": 3,
+     "Python Proficiency": 3,
+     "Database Experience": 3,
+     "Message Queues": 3,
+     "Cloud Deployment": 3,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 3
+    },
+    "ungrounded": 1,
+    "mean_agreement": 1.0,
+    "n_criteria": 9,
+    "latency_s": 116.7641,
+    "tokens": 3817,
+    "llm_calls": 2,
+    "retries": 0
+   },
+   {
+    "overall": 93.9,
+    "recommendation": "Strong fit",
+    "levels": {
+     "Backend Experience": 4,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 4,
+     "Cloud Deployment": 4,
+     "Education": 3,
+     "Payments Domain": 4,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 3
+    },
+    "raw_levels": {
+     "Backend Experience": 4,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 4,
+     "Cloud Deployment": 4,
+     "Education": 3,
+     "Payments Domain": 4,
+     "Kubernetes Familiarity": 2,
+     "Observability Tools": 3
+    },
+    "ungrounded": 1,
+    "mean_agreement": 1.0,
+    "n_criteria": 9,
+    "latency_s": 65.6604,
+    "tokens": 3803,
+    "llm_calls": 2,
+    "retries": 0
+   }
+  ],
+  "B (strong, similar to A)": [
+   {
+    "overall": 87.3,
+    "recommendation": "Strong fit",
+    "levels": {
+     "Backend Experience": 3,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 3,
+     "Cloud Deployment": 4,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 2
+    },
+    "raw_levels": {
+     "Backend Experience": 4,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 3,
+     "Cloud Deployment": 4,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 2
+    },
+    "ungrounded": 1,
+    "mean_agreement": 1.0,
+    "n_criteria": 9,
+    "latency_s": 66.2852,
+    "tokens": 3608,
+    "llm_calls": 2,
+    "retries": 0
+   },
+   {
+    "overall": 85.0,
+    "recommendation": "Strong fit",
+    "levels": {
+     "Backend Experience": 3,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 3,
+     "Cloud Deployment": 3,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 2
+    },
+    "raw_levels": {
+     "Backend Experience": 4,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 3,
+     "Cloud Deployment": 3,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 2
+    },
+    "ungrounded": 1,
+    "mean_agreement": 1.0,
+    "n_criteria": 9,
+    "latency_s": 136.24120000000002,
+    "tokens": 3574,
+    "llm_calls": 2,
+    "retries": 0
+   },
+   {
+    "overall": 86.5,
+    "recommendation": "Strong fit",
+    "levels": {
+     "Backend Experience": 3,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 3,
+     "Cloud Deployment": 3,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 3
+    },
+    "raw_levels": {
+     "Backend Experience": 4,
+     "Python Proficiency": 4,
+     "Database Experience": 4,
+     "Message Queues": 3,
+     "Cloud Deployment": 3,
+     "Education": 3,
+     "Payments Domain": 3,
+     "Kubernetes Familiarity": 1,
+     "Observability Tools": 3
+    },
+    "ungrounded": 1,
+    "mean_agreement": 1.0,
+    "n_criteria": 9,
+    "latency_s": 65.6045,
+    "tokens": 3509,
+    "llm_calls": 2,
+    "retries": 0
+   }
+  ],
+  "C (adjacent / weaker)": [
+   {
+    "overall": 24.4,
+    "recommendation": "Not a fit",
+    "levels": {
+     "Backend Experience": 1,
+     "Python Proficiency": 2,
+     "Database Experience": 1,
+     "Message Queues": 0,
+     "Cloud Deployment": 1,
+     "Education": 1,
+     "Payments Domain": 2,
+     "Kubernetes Familiarity": 0,
+     "Observability Tools": 0
+    },
+    "raw_levels": {
+     "Backend Experience": 1,
+     "Python Proficiency": 2,
+     "Database Experience": 1,
+     "Message Queues": 0,
+     "Cloud Deployment": 1,
+     "Education": 1,
+     "Payments Domain": 2,
+     "Kubernetes Familiarity": 0,
+     "Observability Tools": 0
+    },
+    "ungrounded": 0,
+    "mean_agreement": 1.0,
+    "n_criteria": 9,
+    "latency_s": 43.938199999999995,
+    "tokens": 3168,
+    "llm_calls": 2,
+    "retries": 0
+   },
+   {
+    "overall": 29.0,
+    "recommendation": "Not a fit",
+    "levels": {
+     "Backend Experience": 1,
+     "Python Proficiency": 2,
+     "Database Experience": 1,
+     "Message Queues": 0,
+     "Cloud Deployment": 2,
+     "Education": 1,
+     "Payments Domain": 2,
+     "Kubernetes Familiarity": 0,
+     "Observability Tools": 0
+    },
+    "raw_levels": {
+     "Backend Experience": 1,
+     "Python Proficiency": 2,
+     "Database Experience": 1,
+     "Message Queues": 0,
+     "Cloud Deployment": 2,
+     "Education": 1,
+     "Payments Domain": 2,
+     "Kubernetes Familiarity": 0,
+     "Observability Tools": 0
+    },
+    "ungrounded": 0,
+    "mean_agreement": 1.0,
+    "n_criteria": 9,
+    "latency_s": 78.19789999999999,
+    "tokens": 3191,
+    "llm_calls": 2,
+    "retries": 0
+   },
+   {
+    "overall": 24.4,
+    "recommendation": "Not a fit",
+    "levels": {
+     "Backend Experience": 1,
+     "Python Proficiency": 2,
+     "Database Experience": 1,
+     "Message Queues": 0,
+     "Cloud Deployment": 1,
+     "Education": 1,
+     "Payments Domain": 2,
+     "Kubernetes Familiarity": 0,
+     "Observability Tools": 0
+    },
+    "raw_levels": {
+     "Backend Experience": 1,
+     "Python Proficiency": 2,
+     "Database Experience": 1,
+     "Message Queues": 0,
+     "Cloud Deployment": 1,
+     "Education": 1,
+     "Payments Domain": 2,
+     "Kubernetes Familiarity": 0,
+     "Observability Tools": 0
+    },
+    "ungrounded": 0,
+    "mean_agreement": 1.0,
+    "n_criteria": 9,
+    "latency_s": 41.1968,
+    "tokens": 3184,
+    "llm_calls": 2,
+    "retries": 0
+   }
+  ]
+ }
+}

@@ -83,3 +83,25 @@ invented fragment still fails). Genuine failures still fail: A's "Kubernetes" qu
 Also found while building sectioned scoring: the extractor reported `total_experience_years = 6.0` for A, while the role
 dates (Jul 2018 - present, contiguous) give 8.2 years. It most likely copied "6 years" from the resume's own summary line. Years
 are now computed in code from dates (overlaps merged, internships excluded) and shown to the scorer.
+
+## 5. Scorer experiment matrix (same cached criteria, 3 resumes x 3 repeats each)
+
+All with the new rubric and points. Reports are in `reports/`. Variants 3-5 ran after the fragment-grounding fix
+(entry 4), so compare *raw* levels across all variants, or final scores within 3-5.
+
+| # | Scorer variant | mean A / B / C | \|A-B\| | Range A / B / C | Tokens/run | Latency/run |
+|---|---|---|---|---|---|---|
+| 1 | single, markdown, T=0 | 90.1 / 87.5 / 24.0 | 2.6 | 0.0 / 3.8 / 1.2 | ~3.7k | ~46 s |
+| 2 | single, JSON, T=0 | 93.8 / 93.3 / 30.1 | 0.5 | 1.5 / 9.0 / 5.7 | ~3.9k | ~53 s |
+| 3 | single, markdown, T=0.5 | 89.3 / 86.3 / 25.9 | 3.0 | 13.2 / 2.3 / 4.6 | ~3.5k | ~76 s |
+| 4 | single, markdown, T=0.5, median of 3 | 93.8 / 87.3 / 22.0 | 6.5 | 1.5 / 2.3 / 3.7 | ~8.1k | ~56 s |
+| 5 | **sectioned, markdown, T=0** | 93.8 / 91.3 / 30.0 | 2.5 | 1.5 / 1.5 / 3.1 | ~7.3k | ~40 s |
+
+- T=0.5 with one sample is the noisiest (A dropped to 80.7 once), as expected.
+- Median-of-3 at T=0.5 gets back to T=0's stability but costs 2.2x the tokens, so it's not worth it here.
+- JSON input: similar means but noisier (B range 9.0) and ~6% more tokens than markdown.
+- Sectioned: the most stable, and faster because 4 small calls run in parallel. Tokens roughly double because the rubric
+  system prompt is repeated per section. At the provider's cost estimate for this model (~$0.37 / 1M tokens) that is
+  about $0.003 per resume.
+- Chosen default: **sectioned, markdown, T=0, 1 sample**. The latency outlier in run 3 (116-136 s) was provider-side
+  slowness during that window, not the variant.

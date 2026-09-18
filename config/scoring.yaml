@@ -12,6 +12,12 @@ scorer_input_format: markdown
 scorer_temperature: 0.0
 scorer_samples: 1
 
+# single    = all criteria in one call against the whole profile
+# sectioned = criteria grouped by JD section (experience / skills / education / domain), each scored in a
+#             parallel call against only the resume sections that can evidence it, with section-specific rules.
+# Sectioned was the most stable in calibration (worst range 3.1 vs 3.8) and faster (~40 s vs ~46 s) at ~2x tokens.
+scoring_mode: sectioned
+
 # Each criterion's weight = importance_weight * category_weight
 importance_weights:
   must_have: 3.0
