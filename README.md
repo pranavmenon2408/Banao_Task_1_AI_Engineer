@@ -6,8 +6,9 @@ per requirement. Every requirement shows the line from the JD it came from, the 
 
 **How it works (two agents):**
 
-1. **Parse** the files (PDF / DOCX / TXT). Unreadable files (scanned, encrypted, corrupt, garbled) are rejected
-   with a specific error and a hint.
+1. **Parse** the files (PDF / DOCX / TXT). PDFs are read column by column, so two-column resumes come out in the
+   right order. Scanned resumes are OCR'd with Tesseract, with a Hugging Face vision model as backup. Files that
+   still can't be read (encrypted, corrupt, blank scans) are rejected with a specific error and a hint.
 2. **Agent 1** turns the resume into a structured profile (roles, dated bullets copied verbatim, skills, education).
    Long resumes are split at section headings and merged back together.
 3. **Agent 2** pulls the hiring criteria out of the JD (cached per JD, so every resume is judged against the same
@@ -67,6 +68,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+**Optional, for scanned resumes:** install [Tesseract](https://github.com/tesseract-ocr/tesseract)
+(Windows: the UB-Mannheim installer; macOS: `brew install tesseract`; Ubuntu: `apt install tesseract-ocr`). If it
+isn't on your PATH, set `TESSERACT_CMD` in `.env`. Without Tesseract, scanned resumes go straight to the vision
+model, which is slower (~6 s/page) and uses tokens. The Docker image already includes Tesseract.
+
 Start the API and the UI in two terminals:
 
 ```bash
@@ -87,7 +93,8 @@ Then open http://localhost:8501.
 3. Click **Assess fit**. A run takes roughly 30–60 s with the default model.
 4. Use the sidebar sliders to change the weights. The score updates instantly without calling the LLM again.
 
-Try it with the files in `samples/`. `samples/unreadable_*.pdf` shows how bad files are handled.
+Try it with the files in `samples/`. `resume_a_two_column.pdf` and `resume_a_scanned.pdf` are the same resume as
+`resume_a_strong.pdf` in harder formats (all three score the same). `unreadable_*.pdf` shows how bad files are handled.
 
 ### Through the API
 
@@ -109,9 +116,11 @@ Errors always come back as `{"error": {"code", "message", "hint", "field"}}`. Fo
 
 ### Configuration
 
-- **`.env`:** token, model (`HF_MODEL`, default `Qwen/Qwen2.5-72B-Instruct`), provider, timeouts, retries.
+- **`.env`:** token, model (`HF_MODEL`, default `Qwen/Qwen2.5-72B-Instruct`), OCR backup model (`HF_VLM_MODEL`,
+  default `meta-llama/Llama-4-Scout-17B-16E-Instruct`), `TESSERACT_CMD`, provider, timeouts, retries.
 - **`config/scoring.yaml`:** importance and category weights, points per rubric level, knockout rule,
-  recommendation bands, grounding threshold, scoring mode, scorer temperature and samples.
+  recommendation bands, grounding threshold, scoring mode, scorer temperature and samples, OCR settings
+  (page cap, Tesseract DPI and confidence threshold, vision-model fallback).
 
 ### Tests and calibration
 
@@ -131,16 +140,20 @@ python -m scripts.calibrate --repeats 3   # real LLM: scores 3 sample resumes 3x
   overridden per request.
 - Consistency on the three calibration samples: the two similar resumes land a few points apart, not 40
   (numbers in [EXPLANATION.md](EXPLANATION.md) and `reports/`).
-- Unreadable resumes are detected and explained, not crashed on: scanned or image-only PDFs, password-protected
-  PDFs, corrupt files, garbled font encodings, wrong file types, near-empty files.
+- Two-column PDFs are read in the right order (sidebar, then main column).
+- Scanned resumes are OCR'd: Tesseract first (~1.5 s/page, free), then a vision model if Tesseract is missing or
+  unsure (~6 s and ~2.8k tokens/page). The parse method and its cost show up in the run metrics.
+- Resumes that really can't be read are detected and explained, not crashed on: blank or illegible scans,
+  password-protected PDFs, corrupt files, garbled font encodings, wrong file types, near-empty files.
 - LLM failures (timeouts, rate limits, bad JSON) are retried or repaired, then reported as clean errors.
 
 **Doesn't (yet)**
-- **No OCR.** Scanned resumes are rejected with advice instead of being read.
+- OCR'd text is trusted as-is. A vision model could "clean up" or invent words, and the recruiter only gets a warning.
+  Tesseract is set up for English only.
 - Calibration is only checked on **3 hand-written samples for one JD**, which isn't a real accuracy evaluation.
-- One run takes about 30–60 s, which depends on the Hugging Face provider's speed.
+- One run takes about 20–60 s, which depends on the Hugging Face provider's speed.
 - No authentication, no database (results live in a local JSON cache and `data/runs.jsonl`).
 - The Docker setup was written but not built on my machine (Docker isn't installed there). The local setup was tested.
-- Multi-column PDF layouts can extract in the wrong reading order, which can hurt profile extraction.
+- Only two-column layouts were tested. Tables, three columns and floating text boxes may still come out in the wrong order.
 - An unverifiable quote only costs one level (`grounding.ungrounded_level_penalty`), so a hallucinated "meets" (3)
   becomes "partial" (2), not 0. That is deliberately lenient because PDF extraction sometimes mangles real quotes.

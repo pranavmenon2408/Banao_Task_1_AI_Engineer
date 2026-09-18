@@ -1,49 +1,55 @@
 # Explanation: Resume ↔ JD Fit Scorer
 
-**Setup:** Agent 1 turns the resume into a structured profile. Agent 2 pulls criteria out of the JD and gives each
-a level from 0 to 4 with quoted evidence. Plain Python then checks the quotes against the resume and computes the
-score from `config/scoring.yaml`. The model is Qwen2.5-72B-Instruct via Hugging Face. Numbers are from
-`scripts/calibrate.py` (3 sample resumes × 3 runs; raw results in `reports/` and `docs/DEVLOG.md`).
+**Setup:** Agent 1 turns the resume into a structured profile. Agent 2 pulls criteria from the JD and gives each a
+level from 0 to 4, quoting the resume. Plain Python checks every quote is really in the resume and computes the score
+from `config/scoring.yaml`. The model is Qwen2.5-72B via Hugging Face. The numbers are in `docs/DEVLOG.md`.
 
-### 1. Design parameter: scorer temperature (kept at 0, one sample)
+### 1. Design parameters: chunking, and scorer temperature
 
-I first wanted to give the scorer some temperature (0.4–0.5) so it wouldn't be too rigid. Instead of guessing, I
-scored the same three resumes 3 times each with each setting:
+**Chunking:** I split the resume at its section headings, up to about 3,000 tokens per chunk, never mid-section. A
+normal 1–3 page resume is 600–2,000 tokens, so it reaches Agent 1 in one piece and nothing gets lost in merging (all
+my samples were one chunk). I avoided fixed 512-token windows because they cut a job title off from its bullets, and
+the model then gives achievements to the wrong job. Agent 2 needs no chunking because it only sees the short profile.
 
-| Scorer setting | Worst score range for one resume | Tokens per resume |
+**Scorer temperature (kept at 0):** I wanted 0.4–0.5 at first, so I tested it on the same resumes, 3 runs each:
+
+| Scorer setting | Biggest score swing for one resume | Tokens per resume |
 |---|---|---|
-| T = 0, 1 sample | 3.8 | ~3.7k |
-| T = 0.5, 1 sample | **13.2** (strong resume dropped to 80.7 once) | ~3.5k |
-| T = 0.5, median of 3 samples | 3.7 | **~8.1k** |
+| T = 0 | 3.8 | ~3.7k |
+| T = 0.5 | **13.2** (strong resume dropped to 80.7 once) | ~3.5k |
+| T = 0.5, median of 3 runs | 3.7 | **~8.1k** |
 
-T = 0.5 alone made the same resume jump around, which is exactly what the task says not to do. The median of 3
-fixed that but only matched T = 0 at over twice the tokens. So I kept T = 0 and put the effort into a stricter
-rubric and scoring the JD section by section (experience, skills, education, domain) in parallel calls.
+0.5 made the same resume jump around. The median fixed that but cost twice the tokens for no gain over T = 0.
 
-### 2. A failure I saw: the scorer quoted the JD as if it were the resume
+### 2. Failures I actually saw
 
-On my first full run the strong candidate got level 2 for "Kubernetes familiarity", with the evidence
-*"Familiarity with Kubernetes."* That sentence is from the **job description**; the resume never mentions
-Kubernetes. The criteria and the profile were in the same prompt in the same format (JSON strings), so the model
-mixed up which one it was quoting. It only got caught because I'd written a check that searches for every quote
-in the actual resume text. It scored 0.43 against my 0.80 threshold, so it was flagged and lost a level. I then
-put the criteria and profile in clearly separated blocks, switched the profile to Markdown and added a "never quote
-the criteria" rule. I kept the code check, because the prompt alone can't be trusted.
+**The scorer quoted the JD as if it were the resume.** The strong candidate got level 2 for Kubernetes with the
+evidence *"Familiarity with Kubernetes."*, which is a line from the JD. The resume never mentions Kubernetes. Criteria
+and profile were in one prompt in the same JSON format, so the model mixed them up. My quote check caught it (0.43
+similarity, needs 0.80). I then split the prompt into clearly labelled blocks and kept the check.
 
-### 3. Metric: how much one resume's score moves between identical runs
+**Two-column and scanned PDFs.** I made a two-column copy and a scanned-image copy of the same resume. pypdf read the
+columns across the page, so sidebar skills landed inside experience bullets ("…transaction status / Kafka /
+updates…"). Agent 1 mostly repaired it, but bullets only matched the resume at 0.93–0.96 instead of 1.00. The scan
+was just rejected as unreadable. I switched to PyMuPDF and read by column position, and added OCR: Tesseract first
+(1.5 s, free), then a Hugging Face vision model only if Tesseract is missing or unsure (~6 s, ~2.8k tokens per page).
+All three copies now score 93.3.
 
-The first version moved **16 points** at temperature 0 (92.3 → 76.3). Looking at per-criterion levels, four
-criteria flipped between 3 ("meets") and 4 ("exceeds") *together*. The model was forming an overall impression
-instead of judging each criterion, and each flip cost 25 points. Making level 4 require a specific written condition
-and changing the points to 0/25/55/85/100 brought it to 3.8. Sectioned scoring brought it to **3.1**. The two similar
-resumes now land **2.5 points apart** (93.8 vs 91.3) and the weak one sits at 30. I also logged latency and tokens per
-stage: sectioned is faster (~40 s vs ~46 s) but uses about 2× the tokens, which is still around $0.003 per resume.
+### 3. Metric: how much the score changes when I run the same resume again
+
+The same resume should get the same score every time. My first version gave one resume **92.3, then 76.3**. Four
+criteria were flipping between "meets" (3) and "exceeds" (4) together, and each flip was worth 25 points. Once
+"exceeds" needed a specific written reason and the points became 0/25/55/85/100, the change dropped to about 4 points,
+and the two similar resumes now land within 1–5 points of each other. I also tried scoring the JD section by section
+in separate calls. In a fair side-by-side test it was **not** more consistent, but it was about 30% faster (22 s vs
+31 s) and followed the section rules better, for twice the tokens (still about $0.002 per resume).
 
 ### 4. What I didn't finish and what I'd do next
 
-- **Real accuracy:** I showed consistency, not correctness. Three resumes I wrote for one JD isn't a test set. Next
-  I'd get 30–50 real pairs labelled by a recruiter and check how often I'm within one level of them.
-- **OCR:** scanned PDFs are detected and rejected with a clear message, but not read. I'd add Tesseract as a fallback.
-- **Token cost:** the full rubric is repeated in every section call. I'd trim each call down to its own rules.
-- **Docker:** written but not built, because Docker isn't installed on my laptop. Everything was tested locally.
-- **Multi-column PDFs** can extract in the wrong reading order, and I haven't handled that.
+- **Real accuracy:** I showed consistency, not correctness. Next I'd get 30–50 real pairs scored by a recruiter and
+  check how often I'm within one level of them.
+- **Trusting OCR text:** a vision model can "clean up" or invent words that my quote check would then accept. For now
+  I only warn the recruiter. Tesseract is also set up for English only.
+- **Harder layouts:** tables, three columns and text boxes are untested; I only tested two columns.
+- **Cost:** the full rubric is repeated in every section call; I'd trim each call to its own rules.
+- **Docker:** written but never built, because Docker isn't installed on my laptop. Everything was tested locally.
