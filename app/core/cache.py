@@ -11,7 +11,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from app.config import ROOT, get_settings
+from app.core.config import ROOT, get_settings
 
 
 def text_hash(*parts: str) -> str:

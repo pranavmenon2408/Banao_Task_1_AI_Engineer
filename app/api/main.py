@@ -21,13 +21,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError, model_validator
 
-from app.config import get_scoring_config, get_settings
-from app.llm import LLMError
-from app.ocr import OcrEngine
-from app.parsing import DocumentError, check_text, extract_text, normalize
+from app.core.config import get_scoring_config, get_settings
+from app.llm.client import LLMError
+from app.documents.ocr import OcrEngine
+from app.documents.parsing import DocumentError, check_text, extract_text, normalize
 from app.pipeline import ScoringPipeline
-from app.schemas import (ApiError, ErrorCode, RescoreRequest, RescoreResult, ScoreResult, WeightOverrides)
-from app.scoring import aggregate
+from app.core.schemas import (ApiError, ErrorCode, RescoreRequest, RescoreResult, ScoreResult, WeightOverrides)
+from app.scoring.aggregation import aggregate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("api")

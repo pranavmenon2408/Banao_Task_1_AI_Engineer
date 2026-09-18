@@ -23,10 +23,10 @@ from functools import cached_property
 import pymupdf
 from PIL import Image
 
-from app.config import OcrConfig, Settings, get_settings
-from app.llm import LLMClient, LLMError
-from app.prompts import VLM_TRANSCRIBE_PROMPT
-from app.schemas import StageMetric
+from app.core.config import OcrConfig, Settings, get_settings
+from app.llm.client import LLMClient, LLMError
+from app.agents.prompts import VLM_TRANSCRIBE_PROMPT
+from app.core.schemas import StageMetric
 
 log = logging.getLogger(__name__)
 

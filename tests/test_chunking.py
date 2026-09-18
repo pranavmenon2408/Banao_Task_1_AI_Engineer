@@ -1,4 +1,4 @@
-from app.chunking import chunk_resume, estimate_tokens, split_sections
+from app.documents.chunking import chunk_resume, estimate_tokens, split_sections
 
 
 def _long_resume(jobs: int = 30) -> str:

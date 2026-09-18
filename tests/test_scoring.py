@@ -1,8 +1,8 @@
-from app.config import get_scoring_config
-from app.grounding import Grounder
-from app.llm import extract_json
-from app.schemas import Criterion, CriterionAssessment, WeightOverrides
-from app.scoring import aggregate, build_scored
+from app.core.config import get_scoring_config
+from app.scoring.grounding import Grounder
+from app.llm.client import extract_json
+from app.core.schemas import Criterion, CriterionAssessment, WeightOverrides
+from app.scoring.aggregation import aggregate, build_scored
 
 RESUME = """EXPERIENCE
 Senior Engineer, Razorfin (2022 - Present)

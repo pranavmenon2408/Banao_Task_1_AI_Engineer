@@ -6,11 +6,11 @@ import pytest
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-from app import pdf_layout
-from app.config import OcrConfig
-from app.ocr import OcrEngine, OcrFailed
-from app.parsing import DocumentError, extract_text
-from app.schemas import ErrorCode, StageMetric
+from app.documents import pdf_layout
+from app.core.config import OcrConfig
+from app.documents.ocr import OcrEngine, OcrFailed
+from app.documents.parsing import DocumentError, extract_text
+from app.core.schemas import ErrorCode, StageMetric
 from scripts.make_samples import scanned_image_pdf, two_column_pdf
 from tests.conftest import make_image_only_pdf
 
@@ -66,7 +66,7 @@ class FakeVLM:
         self.text, self.fail, self.calls = text, fail, 0
 
     def complete_text(self, messages, metric, max_tokens=2000):
-        from app.llm import LLMError
+        from app.llm.client import LLMError
         self.calls += 1
         metric.llm_calls += 1
         metric.prompt_tokens += 2500

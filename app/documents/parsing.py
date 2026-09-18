@@ -19,11 +19,11 @@ from typing import TYPE_CHECKING
 import pymupdf
 from docx import Document
 
-from app import pdf_layout
-from app.schemas import ErrorCode, StageMetric
+from app.documents import pdf_layout
+from app.core.schemas import ErrorCode, StageMetric
 
 if TYPE_CHECKING:
-    from app.ocr import OcrEngine
+    from app.documents.ocr import OcrEngine
 
 pymupdf.TOOLS.mupdf_display_errors(False)  # we report parse failures ourselves
 
@@ -113,7 +113,7 @@ def _pdf_text(data: bytes, ocr: "OcrEngine | None", purpose: str,
             ErrorCode.NO_TEXT_LAYER,
             f"The PDF has {pages} page(s) but almost no extractable text, so it is probably a scanned image.",
             "OCR is disabled. Ask for a text-based PDF, or upload a .txt/.docx version.")
-    from app.ocr import OcrFailed
+    from app.documents.ocr import OcrFailed
     try:
         out = ocr.run(doc, metric)
     except OcrFailed as exc:

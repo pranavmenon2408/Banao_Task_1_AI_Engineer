@@ -20,11 +20,11 @@ import re
 import statistics
 from concurrent.futures import ThreadPoolExecutor
 
-from app.llm import LLMClient, LLMError
-from app.render import ALL_PARTS, criteria_text, profile_text
-from app.prompts import (CATEGORY_SECTION, CRITERIA_EXTRACTOR_SYSTEM, CRITERIA_EXTRACTOR_USER, SCORER_SYSTEM,
+from app.llm.client import LLMClient, LLMError
+from app.agents.render import ALL_PARTS, criteria_text, profile_text
+from app.agents.prompts import (CATEGORY_SECTION, CRITERIA_EXTRACTOR_SYSTEM, CRITERIA_EXTRACTOR_USER, SCORER_SYSTEM,
                          SCORER_USER, SECTION_ALL, SECTION_FOCUS, SECTION_ONLY, SECTION_PARTS)
-from app.schemas import (AssessmentList, CriteriaList, CriterionAssessment, ErrorCode, ResumeProfile,
+from app.core.schemas import (AssessmentList, CriteriaList, CriterionAssessment, ErrorCode, ResumeProfile,
                          StageMetric)
 
 IMPORTANCE_ORDER = {"must_have": 0, "important": 1, "nice_to_have": 2}

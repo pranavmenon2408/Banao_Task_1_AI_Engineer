@@ -1,7 +1,7 @@
 from datetime import date
 
-from app.experience import parse_month, total_years
-from app.schemas import ExperienceItem
+from app.scoring.experience import parse_month, total_years
+from app.core.schemas import ExperienceItem
 
 TODAY = date(2026, 9, 1)
 

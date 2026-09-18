@@ -1,5 +1,5 @@
 from app.agents.scoring_agent import _jobs, _vote
-from app.schemas import (Criterion, CriterionAssessment, EducationItem, ExperienceItem, ResumeProfile)
+from app.core.schemas import (Criterion, CriterionAssessment, EducationItem, ExperienceItem, ResumeProfile)
 
 PROFILE = ResumeProfile(
     candidate_name="A", skills=["Kafka", "Python"],

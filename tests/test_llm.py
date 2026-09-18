@@ -3,10 +3,10 @@ import json
 import httpx
 import pytest
 
-from app.config import Settings
-from app.llm import LLMClient, LLMError
-from app.providers import OpenAICompatibleTransport, ProviderError, Reply, classify, get_provider
-from app.schemas import AssessmentList, ErrorCode, StageMetric
+from app.core.config import Settings
+from app.llm.client import LLMClient, LLMError
+from app.llm.providers import OpenAICompatibleTransport, ProviderError, Reply, classify, get_provider
+from app.core.schemas import AssessmentList, ErrorCode, StageMetric
 
 GOOD = '{"assessments": [{"criterion_id": "c1", "level": 3, "reasoning": "r", "resume_evidence": ["Python"]}]}'
 
@@ -37,7 +37,7 @@ def metric():
 
 
 def test_transient_error_is_retried(monkeypatch):
-    monkeypatch.setattr("app.llm.time.sleep", lambda _: None)
+    monkeypatch.setattr("app.llm.client.time.sleep", lambda _: None)
     llm = client({"primary": [ProviderError("ReadTimeout", "transient"), GOOD]})
     m = metric()
     assert llm.complete_json("s", "u", AssessmentList, m).assessments[0].level == 3
@@ -45,7 +45,7 @@ def test_transient_error_is_retried(monkeypatch):
 
 
 def test_retries_exhausted_is_temporary_unavailable(monkeypatch):
-    monkeypatch.setattr("app.llm.time.sleep", lambda _: None)
+    monkeypatch.setattr("app.llm.client.time.sleep", lambda _: None)
     llm = client({"primary": [ProviderError("503", "transient", 503)] * 3}, retries=2)
     with pytest.raises(LLMError) as e:
         llm.complete_json("s", "u", AssessmentList, metric())

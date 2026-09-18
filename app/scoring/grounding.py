@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from difflib import SequenceMatcher
 
-from app.schemas import EvidenceCheck
+from app.core.schemas import EvidenceCheck
 
 
 def _norm(s: str) -> str:

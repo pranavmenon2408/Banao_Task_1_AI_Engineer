@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.chunking import chunk_resume
-from app.llm import LLMClient
-from app.prompts import CHUNK_NOTE, RESUME_EXTRACTOR_SYSTEM, RESUME_EXTRACTOR_USER
-from app.schemas import ResumeProfile, StageMetric
+from app.documents.chunking import chunk_resume
+from app.llm.client import LLMClient
+from app.agents.prompts import CHUNK_NOTE, RESUME_EXTRACTOR_SYSTEM, RESUME_EXTRACTOR_USER
+from app.core.schemas import ResumeProfile, StageMetric
 
 
 def _dedupe(items: list[str]) -> list[str]:

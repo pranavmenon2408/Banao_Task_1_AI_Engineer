@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import json
 
-from app.experience import role_months, total_years
-from app.schemas import Criterion, ResumeProfile
+from app.scoring.experience import role_months, total_years
+from app.core.schemas import Criterion, ResumeProfile
 
 IMPORTANCE_LABEL = {"must_have": "MUST HAVE", "important": "IMPORTANT", "nice_to_have": "NICE TO HAVE"}
 ALL_PARTS = frozenset({"header", "experience", "projects", "skills", "education", "certifications", "other"})

@@ -23,9 +23,9 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from app.config import Settings, get_settings
-from app.providers import ProviderError, Transport, build_transport, get_provider
-from app.schemas import ErrorCode, StageMetric
+from app.core.config import Settings, get_settings
+from app.llm.providers import ProviderError, Transport, build_transport, get_provider
+from app.core.schemas import ErrorCode, StageMetric
 
 log = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)

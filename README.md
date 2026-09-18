@@ -77,7 +77,7 @@ model, which is slower (~6 s/page) and uses tokens. The Docker image already inc
 Start the API and the UI in two terminals:
 
 ```bash
-uvicorn app.main:app --port 8000
+uvicorn app.api.main:app --port 8000
 streamlit run ui/streamlit_app.py
 ```
 

@@ -9,8 +9,8 @@ reproducible.
 """
 from __future__ import annotations
 
-from app.config import ScoringConfig
-from app.schemas import Criterion, CriterionAssessment, EvidenceCheck, ScoredCriterion, WeightOverrides
+from app.core.config import ScoringConfig
+from app.core.schemas import Criterion, CriterionAssessment, EvidenceCheck, ScoredCriterion, WeightOverrides
 
 
 def effective_weights(cfg: ScoringConfig, overrides: WeightOverrides | None) -> tuple[dict, dict]:

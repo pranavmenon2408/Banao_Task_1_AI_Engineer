@@ -24,8 +24,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.llm import LLMClient, LLMError  # noqa: E402
-from app.parsing import extract_text  # noqa: E402
+from app.llm.client import LLMClient, LLMError  # noqa: E402
+from app.documents.parsing import extract_text  # noqa: E402
 from app.pipeline import ScoringPipeline  # noqa: E402
 
 SAMPLES = {

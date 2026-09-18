@@ -12,13 +12,13 @@ from pathlib import Path
 
 from app.agents.resume_agent import extract_profile
 from app.agents.scoring_agent import extract_criteria, score_profile
-from app.cache import JsonCache, text_hash
-from app.config import ROOT, ScoringConfig, get_scoring_config, get_settings
-from app.grounding import Grounder
-from app.llm import LLMClient
-from app.prompts import CRITERIA_PROMPT_VERSION, PROMPT_VERSION
-from app.schemas import CriteriaList, ResumeProfile, RunMeta, ScoreResult, StageMetric, WeightOverrides
-from app.scoring import aggregate, build_scored, strengths_and_gaps
+from app.core.cache import JsonCache, text_hash
+from app.core.config import ROOT, ScoringConfig, get_scoring_config, get_settings
+from app.scoring.grounding import Grounder
+from app.llm.client import LLMClient
+from app.agents.prompts import CRITERIA_PROMPT_VERSION, PROMPT_VERSION
+from app.core.schemas import CriteriaList, ResumeProfile, RunMeta, ScoreResult, StageMetric, WeightOverrides
+from app.scoring.aggregation import aggregate, build_scored, strengths_and_gaps
 
 log = logging.getLogger(__name__)
 

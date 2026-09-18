@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
-from app.schemas import ExperienceItem
+from app.core.schemas import ExperienceItem
 
 MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 PRESENT = {"present", "current", "now", "today", "ongoing", "till date", "date"}

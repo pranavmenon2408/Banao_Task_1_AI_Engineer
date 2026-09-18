@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]  # repository root (app/core/config.py -> repo)
 load_dotenv(ROOT / ".env")
 
 

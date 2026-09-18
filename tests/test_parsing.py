@@ -3,8 +3,8 @@ import io
 import pytest
 from docx import Document
 
-from app.parsing import DocumentError, extract_text, garble_ratio
-from app.schemas import ErrorCode
+from app.documents.parsing import DocumentError, extract_text, garble_ratio
+from app.core.schemas import ErrorCode
 from tests.conftest import make_image_only_pdf, make_text_pdf
 
 

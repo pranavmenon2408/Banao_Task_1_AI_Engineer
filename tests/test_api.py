@@ -5,10 +5,10 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-import app.main as main
-from app.config import Settings
-from app.llm import LLMClient, LLMError
-from app.schemas import ErrorCode
+import app.api.main as main
+from app.core.config import Settings
+from app.llm.client import LLMClient, LLMError
+from app.core.schemas import ErrorCode
 from tests.conftest import make_image_only_pdf, make_text_pdf
 
 JD = ("We are hiring a Senior Backend Engineer. Requirements: 5+ years of Python, PostgreSQL, Kafka, Docker and AWS. "
