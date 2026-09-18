@@ -23,6 +23,7 @@ class ErrorCode(str, Enum):
     LLM_UNAVAILABLE = "LLM_UNAVAILABLE"
     LLM_BAD_OUTPUT = "LLM_BAD_OUTPUT"
     CONFIG_ERROR = "CONFIG_ERROR"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
 class ApiError(BaseModel):

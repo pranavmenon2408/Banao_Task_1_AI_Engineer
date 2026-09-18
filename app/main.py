@@ -60,6 +60,14 @@ async def _validation_exc(_: Request, exc: RequestValidationError):
     return JSONResponse(status_code=422, content={"error": err.model_dump(mode="json")})
 
 
+@app.exception_handler(Exception)
+async def _unhandled(_: Request, exc: Exception):
+    log.exception("Unhandled error: %s", exc)
+    err = ApiError(code=ErrorCode.INTERNAL_ERROR, message="Unexpected server error. The failure has been logged.",
+                   hint="Retry the request; if it persists, check the API logs.")
+    return JSONResponse(status_code=500, content={"error": err.model_dump(mode="json")})
+
+
 @app.middleware("http")
 async def _timing(request: Request, call_next):
     rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]

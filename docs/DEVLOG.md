@@ -29,3 +29,33 @@ the criteria (see later entries).
 Also seen: a quote taken from the extractor's generated `summary` field ("Backend engineer with 6 years
 of experience, speci...") matched at only 0.84, because the summary is written by Agent 1, not copied from the resume.
 It passed the 0.80 threshold, but it is weaker evidence than a verbatim bullet.
+
+## 2. Unhandled httpx timeout -> HTTP 500 (bug in my error handling)
+
+Scoring `resume_a_strong.pdf` against the DOCX JD through the API returned **HTTP 500 after 122 s**, and the
+calibration script crashed on its 7th run with the same traceback: `httpx.ReadTimeout: The read operation timed out`.
+Cause: `huggingface_hub` 1.x sends requests through **httpx**, so a slow provider raises `httpx.ReadTimeout`. My retry
+logic caught `InferenceTimeoutError`, `HfHubHTTPError` and the built-in `TimeoutError`/`ConnectionError`, but not httpx's
+exception hierarchy, so the "transient, retry it" path never ran.
+Fix: catch `httpx.TransportError` (covers timeouts, connect errors and protocol errors) as transient and retry with backoff; add a
+catch-all handler so any unexpected exception still leaves the API as a structured `INTERNAL_ERROR` rather than a raw 500;
+add a regression test (`tests/test_llm.py::test_httpx_timeout_is_retried`).
+
+## 3. Calibration baseline: temperature 0 is not stable
+
+`scripts/calibrate.py --repeats 3`, JSON scorer input (prompt v4), criteria cached, profile re-extracted every run.
+(The run crashed on the 7th call because of the bug above, so B and C have 2 runs each.)
+
+| Resume | Runs | Scores |
+|---|---|---|
+| A (strong) | 3 | 92.3, 91.3, **76.3** |
+| B (strong, similar) | 2 | 94.8, **78.8** |
+| C (adjacent) | 2 | 39.8, 39.8 |
+
+- Mean A (86.6) vs mean B (86.8): similar resumes land close **on average**, but a *single* run of the same resume moved
+  **16 points** at temperature 0 with a fixed seed. Provider-side inference is not deterministic.
+- The flips are **correlated**: in the low runs, criteria c2-c5 (Python, DB, queues, cloud) all drop 4 -> 3 *together*.
+  The scorer settles into either an "exceeds everything" mode or a "meets everything" mode, which is a halo effect from scoring all
+  criteria in one call despite the "rate independently" instruction.
+- The weak resume is perfectly stable; all instability sits on the **3-vs-4 boundary**, worth 25 points per criterion
+  with the original `level_points` (75 / 100).

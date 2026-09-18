@@ -18,6 +18,7 @@ import re
 import time
 from typing import TypeVar
 
+import httpx
 from huggingface_hub import InferenceClient
 from huggingface_hub.errors import BadRequestError, HfHubHTTPError, InferenceTimeoutError
 from pydantic import BaseModel, ValidationError
@@ -102,9 +103,13 @@ class LLMClient:
                     self._json_mode = False
                     continue
                 raise LLMError(ErrorCode.LLM_UNAVAILABLE, f"LLM rejected the request: {exc}") from exc
-            except (InferenceTimeoutError, HfHubHTTPError, ConnectionError, TimeoutError) as exc:
+            # huggingface_hub >= 1.0 talks HTTP through httpx, so network timeouts surface as
+            # httpx.TimeoutException rather than InferenceTimeoutError (observed: a ReadTimeout
+            # escaped as an HTTP 500 before this was caught, see docs/DEVLOG.md).
+            except (InferenceTimeoutError, HfHubHTTPError, httpx.TransportError, ConnectionError, TimeoutError) as exc:
                 status = _status(exc)
-                transient = isinstance(exc, (InferenceTimeoutError, ConnectionError, TimeoutError)) or status in TRANSIENT_STATUS
+                transient = (isinstance(exc, (InferenceTimeoutError, httpx.TransportError, ConnectionError, TimeoutError))
+                             or status in TRANSIENT_STATUS)
                 if status in (401, 403):
                     raise LLMError(ErrorCode.CONFIG_ERROR, "Hugging Face rejected the token (401/403). Check HF_TOKEN permissions.") from exc
                 if not transient or attempt >= self.s.llm_max_retries:
