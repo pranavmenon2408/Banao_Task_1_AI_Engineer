@@ -27,12 +27,15 @@ category_weights:
   soft_skill: 0.5
 
 # Map the rubric level (0-4) the scorer assigns to points.
+# "Meets" is what a recruiter acts on, so it earns most of the points; "exceeds" is a bonus. With the
+# original linear 25/50/75/100 a meets<->exceeds wobble cost 25 points per criterion, and that
+# boundary is exactly where repeat runs disagreed (docs/DEVLOG.md, entry 3).
 level_points:
   0: 0     # no evidence
-  1: 25    # tangential / adjacent evidence
-  2: 50    # partially meets
-  3: 75    # meets
-  4: 100   # clearly exceeds, with strong evidence
+  1: 25    # adjacent / transferable evidence
+  2: 55    # partially meets
+  3: 85    # meets
+  4: 100   # exceeds, with a specific stated condition
 
 grounding:
   # If a criterion's cited resume evidence cannot be found in the resume text,

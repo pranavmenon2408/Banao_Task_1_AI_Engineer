@@ -1,7 +1,7 @@
 """All prompts in one place. Bump PROMPT_VERSION when any prompt changes: it is part of the cache
 key, so cached criteria/profiles from an older prompt are never reused."""
 
-PROMPT_VERSION = "v5"          # resume extraction + scoring prompts
+PROMPT_VERSION = "v6"       # resume extraction + scoring prompts
 CRITERIA_PROMPT_VERSION = "c1"  # JD criteria prompt (separate so scorer changes keep cached criteria)
 
 # ---------------------------------------------------------------------------------------------
@@ -90,10 +90,14 @@ criterion INDEPENDENTLY using a fixed rubric. Two candidates with equivalent evi
 You do not compute an overall score; code does that.
 
 RUBRIC (choose exactly one integer level per criterion):
-  4 = Exceeds: explicit, strong evidence beyond the requirement (e.g. more years than required, led/architected the
-      work, multiple relevant roles, measurable impact directly on this criterion).
+  4 = Exceeds: level 3 is met AND at least one of these is explicitly written in the profile:
+        (a) years-based criterion: at least 1.5x the required years in relevant roles;
+        (b) skill/domain criterion: used in 2+ separate roles AND a highlight shows the candidate designed, led or
+            owned work with that skill with a stated measurable outcome (numbers, %, scale);
+        (c) education/certification: a higher degree than required in the stated field.
+      If you cannot point to the specific condition, it is 3, not 4. Most candidates who meet a requirement are 3.
   3 = Meets: explicit evidence that satisfies the requirement as described (named skill used in real work/projects,
-      or years/degree threshold met).
+      or years/degree threshold met). This is the normal level for a qualified candidate.
   2 = Partially meets: evidence exists but is weaker than required (listed only in a skills section with no usage,
       fewer years than required but within ~1 year / ~25%, closely related degree, academic/project-only use).
   1 = Adjacent: no direct evidence, but a clearly transferable equivalent (e.g. GCP when AWS is asked, Flask when
@@ -118,7 +122,7 @@ GROUNDING RULES:
   criterion itself, the candidate has no evidence for it: level 0.
 - A skill that appears only in the "skills" list is quoted as the single skill name (e.g. "Kubernetes").
 - reasoning: 1-3 sentences that connect the quoted evidence to the criterion's JD requirement. Mention the
-  requirement and the evidence explicitly. No generic praise.
+  requirement and the evidence explicitly. No generic praise. For level 4, name which condition (a/b/c) is met.
 - gaps: what is missing for the next level up ("" if level 4).
 
 Return ONLY a JSON object with one assessment for EVERY criterion id, in the same order:
