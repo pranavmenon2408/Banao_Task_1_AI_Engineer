@@ -1,7 +1,7 @@
 """All prompts in one place. Bump PROMPT_VERSION when any prompt changes: it is part of the cache
 key, so cached criteria/profiles from an older prompt are never reused."""
 
-PROMPT_VERSION = "v6"       # resume extraction + scoring prompts
+PROMPT_VERSION = "v7"       # resume extraction + scoring prompts
 CRITERIA_PROMPT_VERSION = "c1"  # JD criteria prompt (separate so scorer changes keep cached criteria)
 
 # ---------------------------------------------------------------------------------------------
@@ -144,14 +144,19 @@ Assess every criterion id listed above. Return JSON only."""
 # against only the resume sections that can evidence it. Appended to SCORER_SYSTEM.
 # ---------------------------------------------------------------------------------------------
 
+# Section rules are shared by both scoring modes so an A/B between them isolates the effect of splitting
+# the call, not of different rules. Sectioned mode adds SECTION_ONLY in front of its one section.
+SECTION_ONLY = "SECTION FOCUS: every criterion in this request belongs to one JD section. Apply these rules:\n"
+SECTION_ALL = "SECTION RULES: apply the rules for each criterion's category:\n"
+
 SECTION_FOCUS = {
-    "experience": """SECTION FOCUS: EXPERIENCE. You are scoring only experience criteria (years and type of work).
+    "experience": """EXPERIENCE criteria (years and type of work):
 - Use the total years line and per-role months, which were computed in code from the role dates. Do not recount.
 - Compare against the JD threshold arithmetically: meets -> 3; >= 1.5x with relevant roles -> 4;
   short by <= 25% -> 2; further short but some relevant work -> 1; none -> 0.
 - "Relevant" years only count roles whose bullets show the type of work the criterion names
   (e.g. backend services); state which roles you counted.""",
-    "skills": """SECTION FOCUS: SKILLS & CERTIFICATIONS. You are scoring only skill/tool/certification criteria.
+    "skills": """SKILLS & CERTIFICATIONS criteria (tools, languages, platforms, certifications):
 - Where the skill appears decides the level:
     named ONLY in the SKILLS list, never in a role or project -> at most 2;
     used in a role's bullet or a project -> 3;
@@ -159,11 +164,11 @@ SECTION_FOCUS = {
 - Accept exact tools and clear aliases (Postgres = PostgreSQL, EKS = managed Kubernetes). A different tool in the
   same family (MySQL for PostgreSQL, GCP for AWS) is 1 unless the JD says "or similar/another".
 - When a criterion lists alternatives ("FastAPI, Django or Flask"), any one of them satisfies it.""",
-    "education": """SECTION FOCUS: EDUCATION. You are scoring only education criteria.
+    "education": """EDUCATION criteria:
 - Degree in the stated field or a closely related one (CS, IT, Software Engineering, Computer Engineering) -> 3.
 - Other STEM degree when the JD accepts "related field" or "equivalent practical experience" -> 2.
 - Unrelated degree -> 1; no degree listed -> 0.""",
-    "domain": """SECTION FOCUS: DOMAIN & SOFT SKILLS. You are scoring only industry/domain knowledge and behavioural criteria.
+    "domain": """DOMAIN & SOFT-SKILL criteria (industry knowledge, behaviours):
 - Domain evidence must come from what the candidate worked on (bullets, projects), not just a company name.
   A company whose name suggests the domain, with no bullet about it, is at most 1.
 - Soft skills need a concrete example in a bullet (led, mentored, presented, owned) for level >= 3.""",

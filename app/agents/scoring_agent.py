@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 from app.llm import LLMClient, LLMError
 from app.render import ALL_PARTS, criteria_text, profile_text
 from app.prompts import (CATEGORY_SECTION, CRITERIA_EXTRACTOR_SYSTEM, CRITERIA_EXTRACTOR_USER, SCORER_SYSTEM,
-                         SCORER_USER, SECTION_FOCUS, SECTION_PARTS)
+                         SCORER_USER, SECTION_ALL, SECTION_FOCUS, SECTION_ONLY, SECTION_PARTS)
 from app.schemas import (AssessmentList, CriteriaList, CriterionAssessment, ErrorCode, ResumeProfile,
                          StageMetric)
 
@@ -74,12 +74,13 @@ def _vote(samples: list[dict[str, CriterionAssessment]], ids: list[str]) -> dict
 
 def _jobs(profile: ResumeProfile, criteria: list, mode: str, fmt: str) -> list[tuple[str, str, list]]:
     """Return (system prompt, profile text, criteria) per scoring call."""
-    if mode == "single":
-        return [(SCORER_SYSTEM, profile_text(profile, fmt), criteria)]
     groups: dict[str, list] = {}
     for c in criteria:
         groups.setdefault(CATEGORY_SECTION.get(c.category, "domain"), []).append(c)
-    return [(SCORER_SYSTEM + "\n\n" + SECTION_FOCUS[sec],
+    if mode == "single":
+        rules = "\n\n".join(SECTION_FOCUS[sec] for sec in groups)
+        return [(SCORER_SYSTEM + "\n\n" + SECTION_ALL + rules, profile_text(profile, fmt, computed_years=True), criteria)]
+    return [(SCORER_SYSTEM + "\n\n" + SECTION_ONLY + SECTION_FOCUS[sec],
              profile_text(profile, fmt, SECTION_PARTS.get(sec, ALL_PARTS), computed_years=True),
              crits) for sec, crits in groups.items()]
 

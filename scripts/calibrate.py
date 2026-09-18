@@ -40,6 +40,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--fresh-criteria", action="store_true")
+    ap.add_argument("--cache-profiles", action="store_true",
+                    help="reuse Agent 1's profile so only the scorer varies between runs")
     ap.add_argument("--model", default=None)
     ap.add_argument("--provider", default=None)
     ap.add_argument("--input-format", choices=["markdown", "json"], default=None)
@@ -49,7 +51,7 @@ def main() -> None:
     args = ap.parse_args()
 
     llm = LLMClient(model=args.model, provider=args.provider)
-    pipe = ScoringPipeline(llm=llm, cache_criteria=not args.fresh_criteria, cache_profiles=False)
+    pipe = ScoringPipeline(llm=llm, cache_criteria=not args.fresh_criteria, cache_profiles=args.cache_profiles)
     overrides = {"scorer_input_format": args.input_format, "scorer_temperature": args.scorer_temperature,
                  "scorer_samples": args.scorer_samples, "scoring_mode": args.scoring_mode}
     pipe.cfg = pipe.cfg.model_copy(update={k: v for k, v in overrides.items() if v is not None})
@@ -97,7 +99,7 @@ def main() -> None:
 
     out_dir = ROOT / "reports"
     out_dir.mkdir(exist_ok=True)
-    tag = ("fresh-criteria" if args.fresh_criteria else "cached-criteria") + f"_{variant}_" + llm.model.split("/")[-1]
+    tag = ("fresh-criteria" if args.fresh_criteria else "cached-criteria") + ("_cached-profiles" if args.cache_profiles else "") + f"_{variant}_" + llm.model.split("/")[-1]
     report = {"model": llm.model, "provider": llm.provider, "repeats": args.repeats, "input_format": fmt,
               "scorer_temperature": pipe.cfg.scorer_temperature, "scorer_samples": pipe.cfg.scorer_samples, "scoring_mode": pipe.cfg.scoring_mode,
               "fresh_criteria": args.fresh_criteria, "summary": summary, "gap_A_B": gap_ab,
@@ -107,7 +109,7 @@ def main() -> None:
     lines = [f"# Calibration report: {llm.model}",
              f"",
              f"- Provider: `{llm.provider}`, temperature 0, seed fixed, scorer input format: `{fmt}`, scorer temperature {pipe.cfg.scorer_temperature}, scorer samples {pipe.cfg.scorer_samples}, scoring mode `{pipe.cfg.scoring_mode}`",
-             f"- Repeats per resume: {args.repeats}; JD criteria {'re-extracted every run' if args.fresh_criteria else 'cached per JD'}; profile cache off",
+             f"- Repeats per resume: {args.repeats}; JD criteria {'re-extracted every run' if args.fresh_criteria else 'cached per JD'}; profile cache {'on (scorer-only variance)' if args.cache_profiles else 'off'}",
              f"- **|mean(A) - mean(B)| = {gap_ab}** (requirement: similar resumes must not be 40 points apart)",
              f"",
              "| Resume | Mean | Min | Max | Range | Stdev | Ungrounded (total) | Mean latency | Mean tokens |",
