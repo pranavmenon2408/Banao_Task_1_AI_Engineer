@@ -26,6 +26,19 @@ class Grounder:
         self.words = self.norm.split()
 
     def similarity(self, quote: str) -> float:
+        best = self._similarity(quote)
+        if best >= 0.97:
+            return best
+        # The scorer often quotes a line the renderer assembled from several extracted fields
+        # ("B.E. Computer Science, RV College of Engineering, 2018"; "Python, FastAPI, Kafka"). Such a
+        # line is grounded if every fragment is. Observed: a correct education level was cut because
+        # the joined line did not exist verbatim (docs/DEVLOG.md).
+        frags = [f.strip() for f in re.split(r"\s*[,|;]\s*", quote) if len(f.strip()) >= 2]
+        if len(frags) > 1:
+            best = max(best, min(self._similarity(f) for f in frags))
+        return best
+
+    def _similarity(self, quote: str) -> float:
         q = _norm(quote.strip(" .\"'…").replace("...", " "))
         if not q:
             return 0.0

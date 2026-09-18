@@ -59,3 +59,27 @@ add a regression test (`tests/test_llm.py::test_httpx_timeout_is_retried`).
   criteria in one call despite the "rate independently" instruction.
 - The weak resume is perfectly stable; all instability sits on the **3-vs-4 boundary**, worth 25 points per criterion
   with the original `level_points` (75 / 100).
+
+## 4. New rubric + points: drift gone; a grounding false positive I caused
+
+After making level 4 require a named condition and moving `level_points` to 0/25/55/85/100
+(markdown input, T=0, single call, 3 repeats):
+
+| Resume | Baseline (old rubric) | New rubric |
+|---|---|---|
+| A | 92.3, 91.3, 76.3 | 90.1, 90.1, 90.1 |
+| B | 94.8, 78.8 | 88.8, 88.8, 85.0 |
+| C | 39.8, 39.8 | 23.2, 24.4, 24.4 |
+
+|mean A - mean B| = 2.6. Worst single-resume range fell from 16.0 to 3.8 points.
+
+**False positive in the grounding check (my bug).** A's Education was judged 3 by the scorer and then cut to 2 in
+every run. The scorer had quoted the line my renderer builds by joining extracted fields,
+"B.E. Computer Science, Computer Science, RV College of Engineering, 2018" (degree and field both contained "Computer
+Science"). That string is not in the resume, so verification failed. Fixes: don't repeat the field when the degree
+already contains it, and have the grounder accept a quote whose every comma/pipe-separated fragment is found (a single
+invented fragment still fails). Genuine failures still fail: A's "Kubernetes" quotes score 0.43 / 0.0.
+
+Also found while building sectioned scoring: the extractor reported `total_experience_years = 6.0` for A, while the role
+dates (Jul 2018 - present, contiguous) give 8.2 years. It most likely copied "6 years" from the resume's own summary line. Years
+are now computed in code from dates (overlaps merged, internships excluded) and shown to the scorer.

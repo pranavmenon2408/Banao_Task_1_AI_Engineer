@@ -34,6 +34,14 @@ def test_grounder_fuzzy_tolerates_small_differences():
     assert g.similarity("Introduced a Kafka based event pipeline for transaction status updates") > 0.85
 
 
+def test_grounder_accepts_line_assembled_from_real_fragments():
+    g = Grounder(RESUME)
+    assert g.similarity("Python, FastAPI, PostgreSQL") == 1.0
+    assert g.similarity("Senior Engineer | Razorfin") == 1.0
+    # ...but one invented fragment sinks the whole quote
+    assert g.similarity("Python, FastAPI, Kubernetes") < 0.8
+
+
 def test_grounder_rejects_hallucination():
     g = Grounder(RESUME)
     assert g.similarity("Familiarity with Kubernetes.") < 0.6
