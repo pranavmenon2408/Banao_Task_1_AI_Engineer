@@ -142,3 +142,5 @@ python -m scripts.calibrate --repeats 3   # real LLM: scores 3 sample resumes 3x
 - No authentication, no database (results live in a local JSON cache and `data/runs.jsonl`).
 - The Docker setup was written but not built on my machine (Docker isn't installed there). The local setup was tested.
 - Multi-column PDF layouts can extract in the wrong reading order, which can hurt profile extraction.
+- An unverifiable quote only costs one level (`grounding.ungrounded_level_penalty`), so a hallucinated "meets" (3)
+  becomes "partial" (2), not 0. That is deliberately lenient because PDF extraction sometimes mangles real quotes.
