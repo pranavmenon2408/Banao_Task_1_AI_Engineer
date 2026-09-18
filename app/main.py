@@ -36,7 +36,14 @@ app = FastAPI(title="Resume-JD Fit Scorer", version="1.0.0",
               description="Two-agent resume vs job-description fit assessment with per-criterion, evidence-grounded scoring.")
 
 ALLOWED_TYPES = frozenset({"pdf", "docx", "txt"})
-LLM_STATUS = {ErrorCode.LLM_UNAVAILABLE: 503, ErrorCode.LLM_BAD_OUTPUT: 502, ErrorCode.CONFIG_ERROR: 500}
+LLM_STATUS = {ErrorCode.LLM_UNAVAILABLE: 503, ErrorCode.MODEL_NOT_AVAILABLE: 503, ErrorCode.LLM_BAD_OUTPUT: 502,
+              ErrorCode.CONFIG_ERROR: 500}
+LLM_HINTS = {
+    ErrorCode.LLM_UNAVAILABLE: "The model provider is temporarily failing; retry in a minute.",
+    ErrorCode.MODEL_NOT_AVAILABLE: ("Retrying will not help: no provider is serving this model right now. Set LLM_MODEL / "
+                                    "LLM_PROVIDER in .env (or add LLM_FALLBACK_MODELS) and restart the API."),
+    ErrorCode.CONFIG_ERROR: "Check the provider, model and API key settings in .env, then restart the API.",
+}
 
 
 class ApiException(Exception):
@@ -109,8 +116,15 @@ class ScoreForm(BaseModel):
 
 @app.get("/health")
 def health():
-    s = get_settings()
-    return {"status": "ok", "model": s.hf_model, "provider": s.hf_provider, "llm_configured": bool(s.hf_token)}
+    llm, ocr = get_pipeline().llm, get_ocr()
+    vlm = ocr.vlm if ocr else None
+    try:
+        configured, problem = bool(llm.transport), None
+    except LLMError as exc:
+        configured, problem = False, exc.message
+    return {"status": "ok", "provider": llm.provider, "model": llm.model, "fallback_models": llm.models[1:],
+            "vlm_provider": vlm.provider if vlm else None, "vlm_model": vlm.model if vlm else None,
+            "llm_configured": configured, "config_problem": problem}
 
 
 @app.get("/api/v1/config")
@@ -162,8 +176,7 @@ def score(resume: UploadFile = File(..., description="Resume: PDF, DOCX or TXT")
                                   extraction={"resume": cv.method, "job_description": jd.method or "text"})
     except LLMError as exc:
         log.error("LLM failure: %s %s", exc.code, exc.message)
-        raise _err(LLM_STATUS.get(exc.code, 502), exc.code, exc.message,
-                   "The language model is temporarily unavailable; retry in a minute." if exc.code == ErrorCode.LLM_UNAVAILABLE else None)
+        raise _err(LLM_STATUS.get(exc.code, 502), exc.code, exc.message, LLM_HINTS.get(exc.code))
 
 
 @app.post("/api/v1/rescore", response_model=RescoreResult)

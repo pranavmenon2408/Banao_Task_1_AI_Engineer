@@ -7,21 +7,40 @@ from pathlib import Path
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
+def _alias(*names: str) -> AliasChoices:
+    return AliasChoices(*names)
 
-    hf_token: str = ""
-    hf_model: str = "meta-llama/Llama-3.3-70B-Instruct"
-    hf_provider: str = "auto"
-    hf_vlm_model: str = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
-    hf_vlm_provider: str = "auto"  # separate from hf_provider: providers host different models
+
+class Settings(BaseSettings):
+    """Env settings. The text model (both agents) and the OCR vision model each get a provider, a model and optional
+    fallback models, so either can run on Hugging Face, OpenAI, Gemini, Groq, Mistral, OpenRouter, Together, Ollama
+    or any OpenAI-compatible endpoint (app/providers.py). Old HF_* names still work as aliases."""
+    model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore", populate_by_name=True)
+
+    # text model: both agents
+    llm_provider: str = "huggingface"
+    llm_model: str = Field("meta-llama/Llama-3.3-70B-Instruct", validation_alias=_alias("LLM_MODEL", "HF_MODEL"))
+    llm_fallback_models: str = ""       # comma-separated, tried in order when the main model is not available
+    llm_api_key: str = ""               # optional; otherwise the provider's own variable (HF_TOKEN, OPENAI_API_KEY, ...)
+    llm_endpoint: str = ""              # only for provider "openai-compatible" (or to override a provider's URL)
+    # Hugging Face only: which inference provider serves the model ("auto" = first one enabled on the account)
+    hf_inference_provider: str = Field("auto", validation_alias=_alias("HF_INFERENCE_PROVIDER", "HF_PROVIDER"))
+
+    # vision model: OCR fallback for scanned resumes
+    vlm_provider: str = ""              # empty = same as llm_provider
+    vlm_model: str = Field("meta-llama/Llama-4-Scout-17B-16E-Instruct", validation_alias=_alias("VLM_MODEL", "HF_VLM_MODEL"))
+    vlm_fallback_models: str = "Qwen/Qwen2.5-VL-72B-Instruct"
+    vlm_api_key: str = ""
+    vlm_endpoint: str = ""
+    vlm_hf_inference_provider: str = Field("auto", validation_alias=_alias("VLM_HF_INFERENCE_PROVIDER", "HF_VLM_PROVIDER"))
+
     tesseract_cmd: str = ""  # path to tesseract binary if it is not on PATH
     llm_temperature: float = 0.0
     llm_seed: int = 42

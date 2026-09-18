@@ -33,13 +33,14 @@ reports/        calibration results
 
 ## Setup
 
-You need a Hugging Face access token with the **"Make calls to Inference Providers"** permission
-(https://huggingface.co/settings/tokens).
+By default it runs on Hugging Face, which needs an access token with the **"Make calls to Inference Providers"**
+permission (https://huggingface.co/settings/tokens). You can use another provider instead; see
+[Choosing a provider and model](#choosing-a-provider-and-model).
 
 ```bash
 git clone https://github.com/pranavmenon2408/Banao_Task_1_AI_Engineer.git
 cd Banao_Task_1_AI_Engineer
-cp .env.example .env          # then put your token in HF_TOKEN
+cp .env.example .env          # then put your key in HF_TOKEN (or your provider's key variable)
 ```
 
 ### Option A: run with Docker
@@ -114,10 +115,49 @@ curl -F "resume=@samples/resume_a_strong.pdf" \
 Errors always come back as `{"error": {"code", "message", "hint", "field"}}`. For example, a scanned PDF gives
 `422 NO_TEXT_LAYER`, and a model outage gives `503 LLM_UNAVAILABLE`.
 
+### Choosing a provider and model
+
+The text model (used by both agents) and the OCR vision model are each set by a **provider**, a **model** and
+optional **fallback models** in `.env`. Any provider with an OpenAI-compatible chat API works.
+
+| `LLM_PROVIDER` | Key variable | Example `LLM_MODEL` |
+|---|---|---|
+| `huggingface` (default) | `HF_TOKEN` | `meta-llama/Llama-3.3-70B-Instruct` |
+| `openai` | `OPENAI_API_KEY` | `gpt-4o-mini` |
+| `google` (Gemini) | `GOOGLE_API_KEY` | `gemini-2.0-flash` |
+| `groq` | `GROQ_API_KEY` | `llama-3.3-70b-versatile` |
+| `mistral` | `MISTRAL_API_KEY` | `mistral-large-latest` |
+| `openrouter` | `OPENROUTER_API_KEY` | `meta-llama/llama-3.3-70b-instruct` |
+| `together` | `TOGETHER_API_KEY` | `meta-llama/Llama-3.3-70B-Instruct-Turbo` |
+| `ollama` (local) | none | `llama3.1:8b` |
+| `openai-compatible` | `LLM_API_KEY` (if needed) | set `LLM_ENDPOINT` to the `/chat/completions` URL |
+
+(Model names are examples; check each provider's current list.) For example, to use OpenAI:
+
+```bash
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4o-mini
+OPENAI_API_KEY=sk-...
+```
+
+- **`LLM_FALLBACK_MODELS`** (comma-separated) are tried in order when the main model isn't being served.
+  The result then carries a warning, because a different model can score differently.
+- **`HF_INFERENCE_PROVIDER`** (Hugging Face only) picks which host serves the model. `auto` uses the first provider
+  enabled on your account.
+- **`VLM_PROVIDER` / `VLM_MODEL` / `VLM_FALLBACK_MODELS`** do the same for the OCR vision model, which must accept
+  images. `VLM_PROVIDER` defaults to `LLM_PROVIDER`.
+- If a model isn't available, the API returns `503 MODEL_NOT_AVAILABLE` with a hint to change the config. It doesn't
+  suggest retrying, because retrying won't help. `GET /health` shows the provider, model and fallbacks in use.
+- The calibration numbers were measured on Hugging Face models. After switching, re-check with
+  `python -m scripts.calibrate --repeats 3`.
+
+The provider layer is `app/providers.py` (registry + transports) and `app/llm.py` (`LLMClient`: retries,
+fallback step-down, JSON repair).
+
 ### Configuration
 
-- **`.env`:** token, model (`HF_MODEL`, default `meta-llama/Llama-3.3-70B-Instruct`), OCR backup model (`HF_VLM_MODEL`,
-  default `meta-llama/Llama-4-Scout-17B-16E-Instruct`), `TESSERACT_CMD`, provider, timeouts, retries.
+- **`.env`:** provider, model and fallbacks for the text and vision models (see above), `TESSERACT_CMD`, timeouts,
+  retries. The old `HF_MODEL` / `HF_PROVIDER` / `HF_VLM_MODEL` names still work.
 - **`config/scoring.yaml`:** importance and category weights, points per rubric level, knockout rule,
   recommendation bands, grounding threshold, scoring mode, scorer temperature and samples, OCR settings
   (page cap, Tesseract DPI and confidence threshold, vision-model fallback).
@@ -145,15 +185,17 @@ python -m scripts.calibrate --repeats 3   # real LLM: scores 3 sample resumes 3x
   unsure (~6 s and ~2.8k tokens/page). The parse method and its cost show up in the run metrics.
 - Resumes that really can't be read are detected and explained, not crashed on: blank or illegible scans,
   password-protected PDFs, corrupt files, garbled font encodings, wrong file types, near-empty files.
-- LLM failures (timeouts, rate limits, bad JSON) are retried or repaired, then reported as clean errors.
+- LLM failures are handled by type: timeouts and rate limits are retried, a model that isn't being served steps down
+  to fallback models, bad JSON gets one repair turn, and anything left is reported as a clean error with the right hint.
+- Any LLM provider: Hugging Face, OpenAI, Gemini, Groq, Mistral, OpenRouter, Together, Ollama or a custom endpoint.
 
 **Doesn't (yet)**
 - OCR'd text is trusted as-is. A vision model could "clean up" or invent words, and the recruiter only gets a warning.
   Tesseract is set up for English only.
 - Calibration is only checked on **3 hand-written samples for one JD**, which isn't a real accuracy evaluation.
-- Depends on Hugging Face providers: if the provider serving `HF_MODEL` goes down, requests fail with
-  `model_not_supported` (currently mislabelled as a temporary error). Switch `HF_MODEL`/`HF_PROVIDER` in `.env`.
-  The calibration history in `docs/DEVLOG.md` was measured on Qwen2.5-72B before it went offline.
+- Only Hugging Face was tested live. The other providers go through the same OpenAI-compatible transport, which is
+  covered by mocked HTTP tests, not real API calls.
+- The calibration history in `docs/DEVLOG.md` was measured on Qwen2.5-72B, then re-checked on Llama-3.3-70B.
 - No authentication, no database (results live in a local JSON cache and `data/runs.jsonl`).
 - The Docker setup was written but not built on my machine (Docker isn't installed there). The local setup was tested.
 - Only two-column layouts were tested. Tables, three columns and floating text boxes may still come out in the wrong order.

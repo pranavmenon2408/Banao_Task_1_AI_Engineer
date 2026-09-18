@@ -1,35 +1,34 @@
-"""Thin wrapper around Hugging Face Inference Providers chat completion.
+"""Provider-agnostic LLM client: pick a provider and a model (plus fallbacks) and call complete_json.
 
 Why not LangChain: the pipeline is two fixed LLM steps with no tools, memory or routing. What we
 actually need (a chat call, JSON parsing, Pydantic validation, retries, metrics) is ~150 lines
-here and every step stays visible and debuggable.
+here and every step stays visible and debuggable. Providers live in app/providers.py.
 
-Error handling:
-  * transient failures (timeouts, 429, 5xx, connection resets) -> exponential backoff retry
-  * provider rejects response_format -> fall back to prompt-only JSON once, remember it
-  * output isn't valid JSON / fails schema -> one "repair" turn that shows the model its error
-  * anything else, or retries exhausted -> LLMError with a code the API maps to 502/503
+Error handling (per model, then down the fallback list):
+  * transient failures (timeouts, 429, 5xx, network)  -> exponential backoff retry
+  * model not served by the provider                   -> next fallback model; none left -> MODEL_NOT_AVAILABLE
+  * bad / missing API key                               -> CONFIG_ERROR immediately
+  * provider rejects response_format                    -> prompt-only JSON from then on
+  * output isn't valid JSON / fails schema              -> one "repair" turn that shows the model its error
+  * retries exhausted on every model                    -> LLM_UNAVAILABLE (a genuinely temporary failure)
 """
 from __future__ import annotations
 
 import json
 import logging
 import re
+import threading
 import time
 from typing import TypeVar
 
-import httpx
-from huggingface_hub import InferenceClient
-from huggingface_hub.errors import BadRequestError, HfHubHTTPError, InferenceTimeoutError
 from pydantic import BaseModel, ValidationError
 
 from app.config import Settings, get_settings
+from app.providers import ProviderError, Transport, build_transport, get_provider
 from app.schemas import ErrorCode, StageMetric
 
 log = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
-
-TRANSIENT_STATUS = {408, 425, 429, 500, 502, 503, 504}
 
 
 class LLMError(Exception):
@@ -56,70 +55,105 @@ def extract_json(text: str) -> dict:
     return obj
 
 
-def _status(exc: Exception) -> int | None:
-    resp = getattr(exc, "response", None)
-    return getattr(resp, "status_code", None)
+def _split(models: str | list[str] | tuple[str, ...] | None) -> list[str]:
+    if not models:
+        return []
+    items = models.split(",") if isinstance(models, str) else models
+    return [m.strip() for m in items if m and m.strip()]
 
 
 class LLMClient:
-    def __init__(self, settings: Settings | None = None, client: InferenceClient | None = None,
-                 model: str | None = None, provider: str | None = None):
+    """One interface over any provider, with backoff and stepping down to fallback models.
+
+    LLMClient()                                          # text model from .env (LLM_PROVIDER / LLM_MODEL)
+    LLMClient(provider="openai", model="gpt-4o-mini")    # explicit
+    LLMClient(role="vlm")                                # OCR vision model from .env (VLM_*)
+    """
+
+    def __init__(self, settings: Settings | None = None, *, provider: str | None = None, model: str | None = None,
+                 fallback_models: str | list[str] | None = None, api_key: str | None = None,
+                 endpoint: str | None = None, hf_provider: str | None = None, role: str = "llm",
+                 transport: Transport | None = None):
         self.s = settings or get_settings()
-        self.model = model or self.s.hf_model
-        self.provider = provider or self.s.hf_provider
-        self._client = client
+        s = self.s
+        vlm = role == "vlm"
+        self.provider_name = get_provider(provider or (s.vlm_provider if vlm and s.vlm_provider else s.llm_provider)).name
+        self.model = model or (s.vlm_model if vlm else s.llm_model)
+        fb = fallback_models if fallback_models is not None else (s.vlm_fallback_models if vlm else s.llm_fallback_models)
+        self.models = [self.model] + [m for m in _split(fb) if m != self.model]
+        self._api_key = api_key if api_key is not None else (s.vlm_api_key if vlm else s.llm_api_key)
+        self._endpoint = endpoint if endpoint is not None else (s.vlm_endpoint if vlm else s.llm_endpoint)
+        self.hf_provider = hf_provider or (s.vlm_hf_inference_provider if vlm else s.hf_inference_provider)
+        self._transport = transport
+        self._lock = threading.Lock()
         self._json_mode = True
+        self.last_model = self.model        # the model that actually answered the most recent call
 
     @property
-    def client(self) -> InferenceClient:
-        if self._client is None:
-            if not self.s.hf_token:
-                raise LLMError(ErrorCode.CONFIG_ERROR, "HF_TOKEN is not set. Copy .env.example to .env and add a token.")
-            self._client = InferenceClient(provider=self.provider, api_key=self.s.hf_token, timeout=self.s.llm_timeout_s)
-        return self._client
+    def provider(self) -> str:
+        """Human-readable route, e.g. 'huggingface/auto' or 'openai'."""
+        return f"{self.provider_name}/{self.hf_provider}" if self.provider_name == "huggingface" else self.provider_name
+
+    @property
+    def transport(self) -> Transport:
+        with self._lock:
+            if self._transport is None:
+                try:
+                    self._transport = build_transport(get_provider(self.provider_name), self._api_key or "",
+                                                      self._endpoint or "", self.hf_provider)
+                except ValueError as exc:
+                    raise LLMError(ErrorCode.CONFIG_ERROR, str(exc)) from exc
+            return self._transport
 
     def _call(self, messages: list[dict], max_tokens: int, metric: StageMetric, temperature: float | None = None,
               json_mode: bool = True) -> str:
-        attempt = 0
-        while True:
-            temp = self.s.llm_temperature if temperature is None else temperature
-            # A fixed seed with temperature > 0 would make every "sample" identical on providers that honour it.
-            kwargs = dict(model=self.model, max_tokens=max_tokens, temperature=temp, seed=self.s.llm_seed if temp == 0 else None)
-            if self._json_mode and json_mode:
-                kwargs["response_format"] = {"type": "json_object"}
-            try:
-                metric.llm_calls += 1
-                resp = self.client.chat_completion(messages, **kwargs)
-                usage = getattr(resp, "usage", None)
-                if usage:
-                    metric.prompt_tokens += usage.prompt_tokens or 0
-                    metric.completion_tokens += usage.completion_tokens or 0
-                content = resp.choices[0].message.content or ""
-                if resp.choices[0].finish_reason == "length":
-                    log.warning("LLM output hit max_tokens=%s; JSON may be truncated", max_tokens)
-                return content
-            except BadRequestError as exc:
-                if self._json_mode and json_mode and "response_format" in str(exc).lower() + str(getattr(exc, "server_message", "")).lower():
-                    log.info("Provider rejected response_format; falling back to prompt-only JSON")
-                    self._json_mode = False
-                    continue
-                raise LLMError(ErrorCode.LLM_UNAVAILABLE, f"LLM rejected the request: {exc}") from exc
-            # huggingface_hub >= 1.0 talks HTTP through httpx, so network timeouts surface as
-            # httpx.TimeoutException rather than InferenceTimeoutError (observed: a ReadTimeout
-            # escaped as an HTTP 500 before this was caught, see docs/DEVLOG.md).
-            except (InferenceTimeoutError, HfHubHTTPError, httpx.TransportError, ConnectionError, TimeoutError) as exc:
-                status = _status(exc)
-                transient = (isinstance(exc, (InferenceTimeoutError, httpx.TransportError, ConnectionError, TimeoutError))
-                             or status in TRANSIENT_STATUS)
-                if status in (401, 403):
-                    raise LLMError(ErrorCode.CONFIG_ERROR, "Hugging Face rejected the token (401/403). Check HF_TOKEN permissions.") from exc
-                if not transient or attempt >= self.s.llm_max_retries:
-                    raise LLMError(ErrorCode.LLM_UNAVAILABLE, f"LLM call failed after {attempt + 1} attempt(s): {type(exc).__name__}: {exc}") from exc
-                delay = min(2 ** attempt, 10)
-                log.warning("Transient LLM error (%s, status=%s); retry %d in %ss", type(exc).__name__, status, attempt + 1, delay)
-                attempt += 1
-                metric.retries += 1
-                time.sleep(delay)
+        temp = self.s.llm_temperature if temperature is None else temperature
+        # A fixed seed with temperature > 0 would make every "sample" identical on providers that honour it.
+        seed = self.s.llm_seed if temp == 0 else None
+        unavailable: list[str] = []
+        last: ProviderError | None = None
+        for model in self.models:
+            attempt = 0
+            while True:
+                try:
+                    metric.llm_calls += 1
+                    reply = self.transport.send(model, messages, max_tokens=max_tokens, temperature=temp, seed=seed,
+                                                json_mode=json_mode and self._json_mode, timeout=self.s.llm_timeout_s)
+                    metric.prompt_tokens += reply.prompt_tokens
+                    metric.completion_tokens += reply.completion_tokens
+                    if reply.finish_reason == "length":
+                        log.warning("LLM output hit max_tokens=%s; JSON may be truncated", max_tokens)
+                    if model != self.model:
+                        log.warning("Answered by fallback model %s (primary %s unavailable)", model, self.model)
+                    self.last_model = model
+                    return reply.content
+                except ProviderError as exc:
+                    last = exc
+                    if exc.kind == "auth":
+                        raise LLMError(ErrorCode.CONFIG_ERROR,
+                                       f"{self.provider_name} rejected the API key ({exc.message[:200]}). "
+                                       "Check the key variable for this provider in .env.") from exc
+                    if exc.kind == "json_mode" and self._json_mode:
+                        log.info("Provider rejected response_format; falling back to prompt-only JSON")
+                        self._json_mode = False
+                        continue
+                    if exc.kind == "transient" and attempt < self.s.llm_max_retries:
+                        delay = min(2 ** attempt, 10)
+                        log.warning("Transient LLM error on %s (%s); retry %d in %ss", model, exc.message[:120], attempt + 1, delay)
+                        attempt += 1
+                        metric.retries += 1
+                        time.sleep(delay)
+                        continue
+                    if exc.kind == "model":
+                        unavailable.append(model)
+                    log.warning("Model %s failed (%s: %s); trying next model if any", model, exc.kind, exc.message[:160])
+                    break
+        if unavailable and len(unavailable) == len(self.models):
+            raise LLMError(ErrorCode.MODEL_NOT_AVAILABLE,
+                           f"{', '.join(unavailable)} is not available on provider {self.provider} right now "
+                           f"({last.message[:200] if last else ''}).")
+        raise LLMError(ErrorCode.LLM_UNAVAILABLE,
+                       f"LLM call failed on {', '.join(self.models)} via {self.provider}: {last.message[:300] if last else ''}")
 
     def complete_json(self, system: str, user: str, schema: type[T], metric: StageMetric, max_tokens: int = 2500,
                       temperature: float | None = None) -> T:

@@ -189,3 +189,19 @@ focused rules, not through hiding sections, every section except education now a
 
 |A - B| = 0.7, no run-to-run change at all, no ungrounded quotes. Through the API, the text, two-column and scanned
 (Tesseract) versions of A all score 93.1 with identical per-criterion levels, in 8-23 s.
+
+## 9. Any provider, fallback models, and the right error
+
+- `app/providers.py`: a provider registry (Hugging Face via `huggingface_hub`; OpenAI, Gemini, Groq, Mistral,
+  OpenRouter, Together, Ollama and any other OpenAI-compatible endpoint via one httpx transport). Every failure is
+  classified as auth / model / transient / json_mode / other.
+- `LLMClient(provider, model, fallback_models)`: retries only transient errors. A model that isn't being served steps
+  down to the next fallback model, and with none left it raises `MODEL_NOT_AVAILABLE` (HTTP 503, hint: change the
+  config). The old "temporary, retry in a minute" message for `model_not_supported` is gone. Output from a fallback
+  model is never cached under the primary model's key, and the result carries a warning.
+- Live check on Hugging Face with a model name nobody serves: with a fallback it took 2 calls and 0 retries, and
+  the fallback answered. Without one it raised `MODEL_NOT_AVAILABLE`. By then Qwen2.5-72B was answering on `auto` again
+  (novita recovered), which fits entry 8.
+- UI bug: the hero card showed the candidate summary as a raw-HTML text box. The HTML was an indented f-string, and
+  when there was no knockout badge the empty line plus 4-space indentation made Markdown render the rest as a code
+  block. All HTML blocks now go through a helper that strips indentation and blank lines.

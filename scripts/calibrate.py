@@ -43,14 +43,15 @@ def main() -> None:
     ap.add_argument("--cache-profiles", action="store_true",
                     help="reuse Agent 1's profile so only the scorer varies between runs")
     ap.add_argument("--model", default=None)
-    ap.add_argument("--provider", default=None)
+    ap.add_argument("--provider", default=None, help="LLM provider (huggingface, openai, google, groq, ...)")
+    ap.add_argument("--hf-provider", default=None, help="Hugging Face inference provider (auto, novita, ...)")
     ap.add_argument("--input-format", choices=["markdown", "json"], default=None)
     ap.add_argument("--scorer-temperature", type=float, default=None)
     ap.add_argument("--scorer-samples", type=int, default=None)
     ap.add_argument("--scoring-mode", choices=["single", "sectioned"], default=None)
     args = ap.parse_args()
 
-    llm = LLMClient(model=args.model, provider=args.provider)
+    llm = LLMClient(model=args.model, provider=args.provider, hf_provider=args.hf_provider)
     pipe = ScoringPipeline(llm=llm, cache_criteria=not args.fresh_criteria, cache_profiles=args.cache_profiles)
     overrides = {"scorer_input_format": args.input_format, "scorer_temperature": args.scorer_temperature,
                  "scorer_samples": args.scorer_samples, "scoring_mode": args.scoring_mode}

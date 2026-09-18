@@ -122,7 +122,7 @@ def _pdf_text(data: bytes, ocr: "OcrEngine | None", purpose: str,
             f"The {purpose} PDF is a scanned image and OCR could not read it ({'; '.join(exc.notes)}).",
             "Ask for a text-based PDF or a clearer scan, or upload a .txt/.docx version.")
     how = ("Tesseract OCR" + (f", confidence {out.confidence:.0f}/100" if out.confidence is not None else "")
-           if out.method == "tesseract" else f"a vision model ({ocr.s.hf_vlm_model.split('/')[-1]})")
+           if out.method == "tesseract" else f"a vision model ({ocr.vlm.last_model.split('/')[-1]})")
     warnings = [f"The {purpose} is a scanned image; its text was read with {how}. "
                 "Check quoted evidence against the original if a score looks off."] + out.notes
     return out.text, pages, f"ocr-{out.method}", warnings

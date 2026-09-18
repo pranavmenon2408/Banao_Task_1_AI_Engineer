@@ -6,7 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main
-from app.llm import LLMError
+from app.config import Settings
+from app.llm import LLMClient, LLMError
 from app.schemas import ErrorCode
 from tests.conftest import make_image_only_pdf, make_text_pdf
 
@@ -17,6 +18,8 @@ JD = ("We are hiring a Senior Backend Engineer. Requirements: 5+ years of Python
 @pytest.fixture
 def client(monkeypatch):
     class StubPipeline:
+        llm = LLMClient(Settings(), provider="huggingface", model="stub-model", transport=object())
+
         def run(self, *a, **k):
             raise LLMError(ErrorCode.LLM_UNAVAILABLE, "provider down")
     monkeypatch.setattr(main, "get_pipeline", lambda: StubPipeline())

@@ -52,7 +52,8 @@ class ScoringPipeline:
                 m.cache_hit = True
                 return CriteriaList.model_validate(cached), key
             crit = extract_criteria(self.llm, jd_text, self.cfg.limits.max_criteria, m)
-            self.criteria_cache.set(key, crit.model_dump())
+            if self.llm.last_model == self.llm.model:   # never cache a fallback model's output under the primary key
+                self.criteria_cache.set(key, crit.model_dump())
             return crit, key
 
     def get_profile(self, resume_text: str, stages: list[StageMetric]) -> tuple[ResumeProfile, int]:
@@ -63,7 +64,8 @@ class ScoringPipeline:
                 m.cache_hit = True
                 return ResumeProfile.model_validate(cached["profile"]), cached["chunks"]
             profile, n = extract_profile(self.llm, resume_text, self.cfg.limits.resume_chunk_tokens, m)
-            self.profile_cache.set(key, {"profile": profile.model_dump(), "chunks": n})
+            if self.llm.last_model == self.llm.model:
+                self.profile_cache.set(key, {"profile": profile.model_dump(), "chunks": n})
             return profile, n
 
     def run(self, resume_text: str, jd_text: str, overrides: WeightOverrides | None = None,
@@ -92,11 +94,14 @@ class ScoringPipeline:
             overall, label, knockout, weights = aggregate(scored, self.cfg, overrides)
             strengths, gaps = strengths_and_gaps(scored)
 
+        if self.llm.last_model != self.llm.model:
+            warnings.append(f"Scored with fallback model {self.llm.last_model} because {self.llm.model} was unavailable; "
+                            "scores may differ from the calibrated model.")
         ungrounded = sum(not s.grounded for s in scored)
         if ungrounded:
             warnings.append(f"{ungrounded} criterion score(s) cited evidence not found in the resume and were reduced.")
 
-        meta = RunMeta(run_id=uuid.uuid4().hex[:12], model=self.llm.model, provider=self.llm.provider,
+        meta = RunMeta(run_id=uuid.uuid4().hex[:12], model=self.llm.last_model, provider=self.llm.provider,
                        total_latency_ms=round((time.perf_counter() - t0) * 1000 + sum(s.latency_ms for s in parse_stages or []), 1),
                        stages=stages, extraction=extraction or {},
                        resume_chars=len(resume_text), resume_chunks=n_chunks, jd_hash=jd_hash, warnings=warnings)

@@ -56,6 +56,13 @@ def esc(s) -> str:
     return html.escape(str(s or ""))
 
 
+def show_html(block: str) -> None:
+    """Render an HTML snippet via st.markdown. Markdown treats a blank line followed by lines indented 4+ spaces
+    as a code block, so an empty optional piece (e.g. no knockout badge) made the rest of a card show up as raw
+    HTML text. Stripping indentation and blank lines keeps it one HTML block."""
+    st.markdown("\n".join(line.strip() for line in block.splitlines() if line.strip()), unsafe_allow_html=True)
+
+
 # ------------------------------------------------------------------ API helpers
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -98,9 +105,9 @@ cfg = api_config()
 with st.sidebar:
     st.markdown("### ⚙️ Backend")
     if health:
-        st.success(f"API online · `{health['model'].split('/')[-1]}`", icon="✅")
+        st.success(f"API online · `{health['model'].split('/')[-1]}` via `{health['provider']}`", icon="✅")
         if not health.get("llm_configured"):
-            st.warning("HF_TOKEN is not set on the server.")
+            st.warning(f"LLM not configured on the server: {health.get('config_problem') or 'check .env'}")
     else:
         st.error(f"API unreachable at {API_URL}")
 
@@ -201,7 +208,7 @@ must = [c for c in crit if c["criterion"]["importance"] == "must_have"]
 must_met = sum(c["final_level"] >= 3 for c in must)
 ungrounded = sum(not c["grounded"] for c in crit)
 
-st.markdown(f"""
+show_html(f"""
 <div class="card hero">
   <div class="ring" style="--p:{score}; --c:{color};"><div><div class="num">{score:.0f}</div><div class="of">/ 100</div></div></div>
   <div style="flex:1; min-width:260px;">
@@ -211,7 +218,7 @@ st.markdown(f"""
     <div class="muted">for <b>{esc(res.get('role_title') or 'the role')}</b></div>
     <div class="muted" style="margin-top:.6rem;">{esc(res['profile'].get('summary'))}</div>
   </div>
-</div>""", unsafe_allow_html=True)
+</div>""")
 
 k = st.columns(4)
 for col, (val, label) in zip(k, [(f"{must_met}/{len(must)}", "Must-haves met"),
@@ -266,7 +273,7 @@ with tab1:
             ev = "<div class='muted'>No supporting evidence found in the resume.</div>"
         flags = "".join(f"<div class='flag'>⚑ {esc(f)}</div>" for f in c["flags"])
         gaps = f"<div style='margin-top:8px'><b>To reach the next level:</b> {esc(c['gaps'])}</div>" if c["gaps"] and lvl < 4 else ""
-        st.markdown(f"""
+        show_html(f"""
 <div class="card">
   <div class="crit-head">
     <div>
@@ -286,7 +293,7 @@ with tab1:
   {ev}
   {gaps}
   {flags}
-</div>""", unsafe_allow_html=True)
+</div>""")
 
 # ------------------------------------------------------------------ profile
 

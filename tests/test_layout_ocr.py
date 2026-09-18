@@ -60,6 +60,8 @@ def test_right_aligned_dates_are_not_a_second_column():
 # ---------------------------------------------------------------- OCR chain (fakes, no network)
 
 class FakeVLM:
+    last_model = "fake/vision-model"
+
     def __init__(self, text="", fail=False):
         self.text, self.fail, self.calls = text, fail, 0
 

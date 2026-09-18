@@ -2,8 +2,8 @@
 
 **Setup:** Agent 1 turns the resume into a structured profile. Agent 2 pulls criteria from the JD and gives each a
 level from 0 to 4, quoting the resume. Plain Python checks every quote is really in the resume and computes the score
-from `config/scoring.yaml`. It runs on Llama-3.3-70B via Hugging Face. I tuned it on Qwen2.5-72B, which went offline
-near the end (point 4). The numbers are in `docs/DEVLOG.md`.
+from `config/scoring.yaml`. It runs on Llama-3.3-70B via Hugging Face (any provider can be configured). I tuned it
+on Qwen2.5-72B, whose host went down for a while near the end (point 4). The numbers are in `docs/DEVLOG.md`.
 
 ### 1. Design parameters: chunking, and scorer temperature
 
@@ -48,9 +48,10 @@ the exact same score on every repeat, and the two similar ones are 0.7 apart.
 
 - **Real accuracy:** I showed consistency, not correctness. Next I'd get 30–50 real pairs scored by a recruiter and
   check how often I'm within one level of them.
-- **Provider dependence:** Qwen's only fast host stopped serving it, and my API told the user "temporary, retry
-  later", which was wrong. The switch to Llama also showed that my section split hid the skills list from a criterion
-  the new model filed under "experience" (fixed). Next: a backup model list and a proper error message.
+- **Provider dependence (partly done):** Qwen's only fast host went down for a while and my API wrongly said
+  "temporary, retry later". It now reports the model as unavailable, steps down to fallback models, and works with
+  any provider (OpenAI, Gemini, Groq, …). I only tested Hugging Face for real. The switch to Llama also showed that
+  my section split hid the skills list from a criterion the new model filed under "experience" (fixed).
 - **Trusting OCR text:** a vision model can "clean up" or invent words that my quote check would accept. For now I only
   warn the recruiter. Tesseract is also set up for English only.
 - **Harder layouts and cost:** tables and three columns are untested, and the full rubric repeats in every section call.
