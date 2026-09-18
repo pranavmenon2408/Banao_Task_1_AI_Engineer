@@ -44,15 +44,12 @@ section by section in separate calls was **not** more consistent in a fair side-
 faster (22 s vs 31 s) for twice the tokens (still about $0.002 per resume). On Llama-3.3-70B all three resumes now get
 the exact same score on every repeat, and the two similar ones are 0.7 apart.
 
-### 4. What I didn't finish and what I'd do next
+### 4. What I didn't finish and what I'd do next: running this at scale
 
-- **Real accuracy:** I showed consistency, not correctness. Next I'd get 30–50 real pairs scored by a recruiter and
-  check how often I'm within one level of them.
-- **Provider dependence (partly done):** Qwen's only fast host went down for a while and my API wrongly said
-  "temporary, retry later". It now reports the model as unavailable, steps down to fallback models, and works with
-  any provider (OpenAI, Gemini, Groq, …). I only tested Hugging Face for real. The switch to Llama also showed that
-  my section split hid the skills list from a criterion the new model filed under "experience" (fixed).
-- **Trusting OCR text:** a vision model can "clean up" or invent words that my quote check would accept. For now I only
-  warn the recruiter. Tesseract is also set up for English only.
-- **Harder layouts and cost:** tables and three columns are untested, and the full rubric repeats in every section call.
-- **Docker:** written but never built, because Docker isn't installed on my laptop. Everything was tested locally.
+- **Queue instead of waiting:** `/score` holds a server thread for the full 20–30 s. I'd return a job id and let
+  scalable workers (Redis + Celery/arq) do the scoring.
+- **Shared state and bulk scoring:** caches and the run log are local files. I'd move them to Redis/Postgres and add a
+  bulk "many resumes, one JD" endpoint that extracts the JD's criteria only once.
+- **Provider limits:** add one shared rate limiter across workers so load queues up instead of failing with 429s.
+- **Fewer tokens:** put the fixed rubric first so the provider can cache it, stop repeating it in section calls, and
+  use batch APIs (about half price) for overnight bulk runs.
